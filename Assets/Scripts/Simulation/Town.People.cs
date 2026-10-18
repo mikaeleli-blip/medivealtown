@@ -253,7 +253,7 @@ namespace MedievalTown.Simulation
         void Flee(int head, List<Citizen> family)
         {
             var h = GetCitizen(head) ?? family[0];
-            AddLog("The " + h.Family + " family fled in the night" + (family.Any(p => p.Rank == Rank.Serf) ? " rather than stay bound to it." : "."), LogKind.Bad);
+            AddLog("The " + h.Family + " family fled in the night" + (family.Any(p => p.Rank == Rank.Serf) ? " rather than stay bound to the land." : "."), LogKind.Bad);
             foreach (var p in family)
             {
                 if (p.Id == ReeveId) ReeveId = -1;
