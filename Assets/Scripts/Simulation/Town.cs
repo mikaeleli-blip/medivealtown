@@ -509,8 +509,8 @@ namespace MedievalTown.Simulation
                 Marry(dad, mom);
                 int n = t.Rng.Next(0, 4);
                 for (int k = 0; k < n; k++) t.Child(mom, dad, t.Rnd(0.5f, 13));
-                if (i == 0) { var gran = t.AddPerson(true, fam, t.Rnd(52, 64), Rank.Serf); gran.MotherId = -1; }
-                home.Stock[(int)Good.Grain] = 130; home.Stock[(int)Good.Firewood] = 20; home.Stock[(int)Good.Cloth] = 4;
+                if (i == 0) { var gran = t.AddPerson(true, fam, t.Rnd(52, 64), Rank.Serf); gran.MotherId = -1; dad.MotherId = gran.Id; }   // his widowed mother lives with them
+                home.Stock[(int)Good.Grain] = 130; home.Stock[(int)Good.Firewood] = 20; home.Stock[(int)Good.Cloth] = 8;
                 strip.HolderId = dad.Id;
                 foreach (var p in t.People.Where(p => p.Family == fam && p.HomeId < 0)) p.HomeId = home.Id;
             }
@@ -523,11 +523,15 @@ namespace MedievalTown.Simulation
                 Marry(dad, mom);
                 int n = t.Rng.Next(0, 3);
                 for (int k = 0; k < n; k++) t.Child(mom, dad, t.Rnd(0.5f, 12));
-                home.Stock[(int)Good.Grain] = 60; home.Stock[(int)Good.Firewood] = 15; home.Stock[(int)Good.Cloth] = 4;
+                home.Stock[(int)Good.Grain] = 60; home.Stock[(int)Good.Firewood] = 15; home.Stock[(int)Good.Cloth] = 8;
                 foreach (var p in t.People.Where(p => p.Family == fam && p.HomeId < 0)) p.HomeId = home.Id;
             }
-            // a couple of young serfs without a cottage of their own yet
-            t.AddPerson(false, t.Pick(Defs.PeasantNames), t.Rnd(15, 22), Rank.Serf);
+            // a grown son still living at home, who'll want a cottage of his own before long
+            {
+                var mom = t.People.Where(p => p.Female && p.Rank == Rank.Serf && p.PartnerId >= 0).OrderByDescending(p => p.Age).First();
+                var lad = t.AddPerson(false, mom.Family, Math.Min(t.Rnd(15, 19), mom.Age - 15), Rank.Serf);
+                lad.MotherId = mom.Id; lad.FatherId = mom.PartnerId;
+            }
 
             t.Rehouse();
             t.ReeveVacancies(true);

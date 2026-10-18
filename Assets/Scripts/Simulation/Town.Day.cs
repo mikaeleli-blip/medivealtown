@@ -36,7 +36,7 @@ namespace MedievalTown.Simulation
         public void PlanDay()
         {
             foreach (var p in People) { p.Chore = Chore.None; p.TaskId = -1; }
-            var sites = Sites.Where(SiteCanProgress).OrderBy(s => s.Type == BuildingType.Road ? 9 : s.Def.IsWall ? 6 : s.Def.IsField ? 0 : s.Type == BuildingType.Granary || s.Type == BuildingType.VillageCross ? 1 : s.Type == BuildingType.Mill ? 2 : s.Type == BuildingType.Cottage ? 3 : 4).ThenBy(s => s.Id).ToList();
+            var sites = Sites.Where(SiteCanProgress).OrderBy(s => s.Type == BuildingType.Road ? 9 : s.Def.IsWall ? 6 : s.Def.IsField ? 0 : s.Type == BuildingType.Granary || s.Type == BuildingType.VillageCross ? 1 : s.Type == BuildingType.Mill ? 2 : s.Type == BuildingType.Cottage ? 3 : 4).ThenBy(s => s.Def.Timber + s.Def.Stone - s.Delivered[(int)Good.Timber] - s.Delivered[(int)Good.Stone]).ThenBy(s => s.Id).ToList();   // the small jobs first: a castle mustn't hold up every house
             var crew = sites.ToDictionary(s => s.Id, s => 0);
             var demesnes = OfType(BuildingType.Demesne).Where(FieldNeedsWork).ToList();
             // sites waiting on timber or stone the stores don't have: week-work goes to the quarry and the woods

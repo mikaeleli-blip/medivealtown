@@ -19,6 +19,12 @@ namespace MedievalTown.Simulation
                 if (IsOfficer(p)) return p.Id;
                 var partner = GetCitizen(p.PartnerId);
                 if (partner != null) return p.Female ? partner.Id : p.Id;
+                // a widowed elder lives with a married son or daughter
+                if (p.Age >= 50)
+                {
+                    var kid = People.FirstOrDefault(c => (c.MotherId == p.Id || c.FatherId == p.Id) && !c.IsChild && c.PartnerId >= 0 && !RoyalHousehold(c) && !IsOfficer(c));
+                    if (kid != null) return kid.Female ? kid.PartnerId : kid.Id;
+                }
                 // unmarried: with a parent if there is one in the village
                 var parent = GetCitizen(p.MotherId) ?? GetCitizen(p.FatherId);
                 if (parent != null && !RoyalHousehold(parent) && !IsOfficer(parent) && (p.IsChild || p.Age < 24)) { p = parent; continue; }
@@ -176,7 +182,7 @@ namespace MedievalTown.Simulation
                 shop.Employees.Remove(p.Id); p.WorkId = -1; free.Add(p);
             }
             // the mill first: the whole village needs it
-            foreach (var b in Buildings.Where(b => b.Built && b.Def.Workers > 0).OrderBy(b => b.Type == BuildingType.Mill ? 0 : b.Type == BuildingType.Woodcutter ? 1 : b.Type == BuildingType.Bakehouse ? 2 : b.Def.IsShop ? 3 : 4).ThenBy(b => b.Id))
+            foreach (var b in Buildings.Where(b => b.Built && b.Def.Workers > 0).OrderBy(b => b.Type == BuildingType.Mill ? 0 : b.Type == BuildingType.Bakehouse ? 1 : b.Type == BuildingType.Woodcutter ? 2 : b.Type == BuildingType.Quarry ? 3 : b.Def.IsShop ? 4 : 5).ThenBy(b => b.Id))
             {
                 while (b.Employees.Count < b.Def.Workers && free.Count > 0)
                 {

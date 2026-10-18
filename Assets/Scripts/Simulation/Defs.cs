@@ -111,7 +111,7 @@ namespace MedievalTown.Simulation
         public const float WoolPerWorker = 0.9f;    // fleeces a shepherd brings in a day (half in winter)
         public const float WoolPerCloth = 3f, ClothPerWorker = 0.5f;
         public const float FishPerWorker = 4f;
-        public const float ClothWear = 1.4f;        // cloth a person wears out in a year
+        public const float ClothWear = 1f;        // cloth a person wears out in a year
         public const float BeastPrice = 3.6f, WoolPrice = 0.5f;
         public const float CreditLimit = 4f;        // what a supplier lets a shop have on credit, paid back from its takings
 
@@ -150,8 +150,8 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Granary, Category = Category.Crown, Name = "Royal Granary", Blurb = "The king's barn and stores: grain, flour, firewood, timber and stone. The grain taxes end up here.", W = 3, H = 2, Timber = 24, Stone = 6, Work = 10, IsStorage = true, Color = "#b5432f" });
             Add(new BuildingDef { Type = BuildingType.Strip, Category = Category.Fields, Name = "Strip Field", Blurb = "A serf family's strips in the open field. They work it on the days they don't owe the king, and give part of the harvest in tax.", W = 5, H = 4, Work = 3, IsField = true, Color = "#a08452" });
             Add(new BuildingDef { Type = BuildingType.Demesne, Category = Category.Hidden, Name = "Royal Demesne", Blurb = "No longer used.", W = 4, H = 4, Work = 3, IsField = true, Color = "#d8b060" });
-            Add(new BuildingDef { Type = BuildingType.Woodcutter, Category = Category.Works, Name = "Woodward's Lodge", Blurb = "Freemen fell the king's trees for timber and split them for firewood.", W = 2, H = 2, Timber = 8, Work = 5, Workers = 3, Radius = 10, WorkerRank = Rank.Freeman, Color = "#7a4e2c" });
-            Add(new BuildingDef { Type = BuildingType.Quarry, Category = Category.Works, Name = "Quarry", Blurb = "Freemen break stone from a hillside or boulders nearby.", W = 2, H = 2, Timber = 6, Work = 5, Workers = 3, Radius = 6, NeedsStone = true, WorkerRank = Rank.Freeman, Color = "#a39c90" });
+            Add(new BuildingDef { Type = BuildingType.Woodcutter, Category = Category.Works, Name = "Woodward's Lodge", Blurb = "Freemen fell the king's trees for timber and split them for firewood.", W = 2, H = 2, Timber = 8, Work = 5, Workers = 2, Radius = 10, WorkerRank = Rank.Freeman, Color = "#7a4e2c" });
+            Add(new BuildingDef { Type = BuildingType.Quarry, Category = Category.Works, Name = "Quarry", Blurb = "Freemen break stone from a hillside or boulders nearby.", W = 2, H = 2, Timber = 6, Work = 5, Workers = 2, Radius = 6, NeedsStone = true, WorkerRank = Rank.Freeman, Color = "#a39c90" });
             Add(new BuildingDef { Type = BuildingType.Mill, Category = Category.Works, Name = "Windmill", Blurb = "The king's mill. Everyone must grind their grain here and leave the miller's share for the crown. Bread feeds better than pottage.", W = 2, H = 2, Timber = 20, Stone = 6, Work = 12, Workers = 1, WorkerRank = Rank.Freeman, Color = "#f0ece0" });
             Add(new BuildingDef { Type = BuildingType.Alehouse, Category = Category.Trades, Name = "Alehouse", Blurb = "A freeman family brews ale from grain it buys and sells it of an evening. A cup now and then keeps folk content.", W = 2, H = 2, Timber = 14, Stone = 2, Work = 8, Workers = 2, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Ale, Buys = Good.Grain, Price = Balance.AlePrice, Cap = 60, Color = "#c49a3a" });
             // raw goods: a freeman family raises or catches them and sells them on
