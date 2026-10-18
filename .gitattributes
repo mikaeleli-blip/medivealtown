@@ -1,0 +1,22 @@
+* text=auto
+
+# Unity YAML: merge with Unity's Smart Merge if configured
+*.unity    text merge=unityyamlmerge eol=lf
+*.prefab   text merge=unityyamlmerge eol=lf
+*.asset    text merge=unityyamlmerge eol=lf
+*.meta     text eol=lf
+*.cs       text diff=csharp
+*.asmdef   text
+
+# Binary
+*.png  binary
+*.jpg  binary
+*.psd  binary
+*.aseprite binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.fbx  binary
+*.blend binary
+*.ttf  binary
+*.otf  binary

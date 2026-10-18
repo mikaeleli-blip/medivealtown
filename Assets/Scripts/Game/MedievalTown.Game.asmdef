@@ -1,0 +1,16 @@
+{
+    "name": "MedievalTown.Game",
+    "rootNamespace": "MedievalTown.Game",
+    "references": [
+        "MedievalTown.Simulation"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
