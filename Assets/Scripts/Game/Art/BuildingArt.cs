@@ -61,12 +61,12 @@ namespace MedievalTown.Game.Art
             }
         }
 
-        public static int VariantOf(Building b) { return b.Type == BuildingType.Cottage || b.Type == BuildingType.FreeHouse ? b.Id % 3 : b.Type == BuildingType.Wall ? b.Mask & 15 : 0; }
+        public static int VariantOf(Building b) { return b.Type == BuildingType.Cottage || b.Type == BuildingType.FreeHouse ? b.Id % 3 : b.Type == BuildingType.Wall ? b.Mask & 31 : 0; }
 
         static readonly Dictionary<int, BuildingSprites> cache = new Dictionary<int, BuildingSprites>();
         public static BuildingSprites Get(BuildingType type, int variant, int season)
         {
-            int key = ((int)type * 16 + variant) * 4 + season;
+            int key = ((int)type * 64 + variant) * 4 + season;
             BuildingSprites s;
             if (!cache.TryGetValue(key, out s)) { s = Make(type, variant, season); cache[key] = s; }
             return s;
@@ -360,7 +360,7 @@ namespace MedievalTown.Game.Art
         /// </summary>
         public static SiteSprites Site(BuildingType type, int variant, int season, int step)
         {
-            int key = (((int)type * 16 + variant) * 4 + season) * 32 + step;
+            int key = (((int)type * 64 + variant) * 4 + season) * 32 + step;
             SiteSprites s;
             if (siteCache.TryGetValue(key, out s)) return s;
             var full = Get(type, variant, season);

@@ -320,6 +320,8 @@ namespace MedievalTown.Simulation
                     var w = OccupantAt(x, y);
                     if (w == null || w.Type != BuildingType.Wall) continue;
                     w.Mask = WallAt(x, y - 1, w) * 1 + WallAt(x + 1, y, w) * 2 + WallAt(x, y + 1, w) * 4 + WallAt(x - 1, y, w) * 8;
+                    var north = OccupantAt(x, y - 1);
+                    if (north != null && north.Def.IsWall && north.Type != BuildingType.Wall) w.Mask |= 16;   // a tower or gatehouse to the north covers the joint
                 }
         }
         int WallAt(int x, int y, Building self) { var o = OccupantAt(x, y); return o != null && o != self && o.Def.IsWall ? 1 : 0; }

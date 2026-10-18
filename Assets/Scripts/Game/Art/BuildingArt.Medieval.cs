@@ -324,12 +324,12 @@ namespace MedievalTown.Game.Art
         static void Wall(Ctx k)
         {
             var tg = k.Tg; bool W = k.Winter; int m = k.V; int y0 = k.Y(0);
-            bool n = (m & 1) != 0, e = (m & 2) != 0, s = (m & 4) != 0, w = (m & 8) != 0;
+            bool n = (m & 1) != 0, e = (m & 2) != 0, s = (m & 4) != 0, w = (m & 8) != 0, northBig = (m & 16) != 0;
             const int faceTop = -2, faceH = 16;   // relative to y0: the front face of a wall running east-west
             // a wall running north-south: its walkway seen from above, edged with merlons
             if (n || s)
             {
-                int ya = n ? 0 : y0 - 6, yb = s ? k.H : y0 + faceTop;
+                int ya = n ? (northBig ? y0 - 2 : 0) : y0 - 6, yb = s ? k.H : y0 + faceTop;   // a tower to the north covers the joint, so stop at its foot
                 tg.R(4, ya, 8, yb - ya, StoneC[2]);
                 for (int y = ya; y < yb; y++) { tg.D(4, y, StoneC[1]); tg.D(11, y, StoneC[3]); if (y % 4 == 0) tg.D(5 + (y / 4) % 6, y, StoneC[0]); }
                 for (int y = ya + 1; y < yb - 1; y += 4) { tg.R(3, y, 2, 2, StoneC[0]); tg.R(11, y, 2, 2, StoneC[1]); if (W) { tg.D(3, y - 1, SNOW); tg.D(12, y - 1, SNOW); } }
@@ -359,7 +359,7 @@ namespace MedievalTown.Game.Art
         {
             var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
             Shadow(tg, 3, y0 + 29, 26);
-            RoundTower(tg, 16, y0 - 22, y0 + 30, 13, W);
+            RoundTower(tg, 16, y0 - 22, y0 + 30, 16, W);
             tg.R(14, y0 + 20, 4, 10, "#3a2618"); tg.R(14, y0 + 20, 4, 1, StoneC[2]);   // a low postern door
             k.M.PileAt = new Vector2Int(-1, -1);
         }
