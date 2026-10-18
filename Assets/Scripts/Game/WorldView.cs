@@ -180,6 +180,7 @@ namespace MedievalTown.Game
             UpdateEffects(si);
             UpdateNight();
             UpdateSelection();
+            UpdateZones();
         }
 
         void SyncGround(int si)
@@ -1093,6 +1094,113 @@ namespace MedievalTown.Game
                 selMarker.color = new Color32(255, 215, 122, 255);
                 Place(selMarker, Mathf.Round(pos.x) - 1, Mathf.Round(pos.y) - 22 - bob, 3, 2);
             }
+        }
+
+        // ================================================================== zones of control
+        // Each tile belongs to the village whose cross is nearest, within reach. The overlay tints those tiles in the colour of the
+        // village's lord (the crown, or a baron) and rules a line where one village's land meets another's or the wild.
+        SpriteRenderer zoneFill, zoneEdge;
+        Texture2D zoneFillTex, zoneEdgeTex;
+        string zoneKey;
+        /// <summary>The village each tile belongs to (-1: none), recomputed when the realm changes.</summary>
+        public int[] ZoneOwner { get; private set; }
+        string ownerKey;
+        /// <summary>The villages whose zones are on show right now, or empty.</summary>
+        public readonly List<int> ZoneShown = new List<int>();
+        const int ZoneScale = 4;   // overlay texels per tile
+
+        static readonly string[] BaronyColours = { "#b5432f", "#3e6a9a", "#5a9a4a", "#8a4a9a", "#c07a2a", "#2a8a8a", "#9a3a6a", "#6a7a2a" };
+        public static Color32 LiegeColour(Town t, Village v)
+        {
+            if (v == null || v.BaronyId < 0) return PixelCanvas.C("#e0b04a");
+            int i = t.Baronies.FindIndex(b => b.Id == v.BaronyId);
+            return PixelCanvas.C(BaronyColours[Mathf.Max(0, i) % BaronyColours.Length]);
+        }
+
+        void EnsureOwners()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var v in town.Villages) { var c = town.CrossOf(v); sb.Append(v.Id).Append(':').Append(c != null ? c.X * 1000 + c.Y : -1).Append(v.Capital ? 'c' : '.').Append(';'); }
+            string k = sb.ToString();
+            if (ZoneOwner != null && k == ownerKey) return;
+            ownerKey = k;
+            if (ZoneOwner == null) ZoneOwner = new int[Town.Cols * Town.Rows];
+            for (int y = 0; y < Town.Rows; y++)
+                for (int x = 0; x < Town.Cols; x++)
+                {
+                    var v = town.VillageAt(x, y);
+                    ZoneOwner[y * Town.Cols + x] = v != null ? v.Id : -1;
+                }
+        }
+
+        void UpdateZones()
+        {
+            ZoneShown.Clear();
+            var gc = GameController.Instance;
+            if (gc == null) return;
+            var sel = gc.Selected;
+            var sb = sel.Kind == SelectionKind.Building ? town.GetBuilding(sel.Id) : null;
+            bool building = gc.Tool == ToolKind.Build && gc.BuildType != BuildingType.Road && !Defs.Get(gc.BuildType).IsWall;
+            if (gc.ZoneView || building) ZoneShown.AddRange(town.Villages.Select(v => v.Id));
+            else if (sb != null && sb.Type == BuildingType.VillageCross && sb.VillageId >= 0) ZoneShown.Add(sb.VillageId);
+            else if (sb != null && sb.Type == BuildingType.Manor)
+            {
+                var bar = town.Baronies.FirstOrDefault(x => x.ManorId == sb.Id);
+                if (bar != null) ZoneShown.AddRange(town.VillagesOf(bar).Select(v => v.Id));
+            }
+            if (zoneFill == null)
+            {
+                zoneFillTex = new Texture2D(Town.Cols * ZoneScale, Town.Rows * ZoneScale, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "ZoneFill" };
+                zoneEdgeTex = new Texture2D(Town.Cols * ZoneScale, Town.Rows * ZoneScale, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "ZoneEdge" };
+                var pivot = new Vector2(0, 1); float ppu = Pixels.PerUnit / (16f / ZoneScale);
+                zoneFill = MakeSr("ZoneFill", layerFx, Sprite.Create(zoneFillTex, new Rect(0, 0, zoneFillTex.width, zoneFillTex.height), pivot, ppu, 0, SpriteMeshType.FullRect), OrderBase - 1);
+                zoneEdge = MakeSr("ZoneEdge", layerFx, Sprite.Create(zoneEdgeTex, new Rect(0, 0, zoneEdgeTex.width, zoneEdgeTex.height), pivot, ppu, 0, SpriteMeshType.FullRect), OrderSmoke - 1);
+                zoneFill.transform.position = zoneEdge.transform.position = Pixels.ToWorld(0, 0);
+                zoneKey = null; ownerKey = null;
+            }
+            bool on = ZoneShown.Count > 0;
+            zoneFill.enabled = zoneEdge.enabled = on;
+            if (!on) return;
+            EnsureOwners();
+            var kb = new System.Text.StringBuilder(ownerKey);
+            foreach (var id in ZoneShown) { var v = town.GetVillage(id); kb.Append('|').Append(id).Append(',').Append(v != null ? v.BaronyId : -9); }
+            foreach (var b in town.Baronies) kb.Append('#').Append(b.Id);
+            string key = kb.ToString();
+            if (key == zoneKey) return;
+            zoneKey = key;
+            DrawZones();
+        }
+
+        void DrawZones()
+        {
+            int W = Town.Cols * ZoneScale, H = Town.Rows * ZoneScale;
+            var fill = new Color32[W * H]; var edge = new Color32[W * H];
+            var shown = new HashSet<int>(ZoneShown);
+            var col = new Dictionary<int, Color32>();
+            foreach (var v in town.Villages) col[v.Id] = LiegeColour(town, v);
+            for (int ty = 0; ty < Town.Rows; ty++)
+                for (int tx = 0; tx < Town.Cols; tx++)
+                {
+                    int o = ZoneOwner[ty * Town.Cols + tx];
+                    if (o < 0 || !shown.Contains(o)) continue;
+                    var c = col[o];
+                    var f = new Color32(c.r, c.g, c.b, 46);
+                    var e = new Color32((byte)(c.r * 0.75f), (byte)(c.g * 0.75f), (byte)(c.b * 0.75f), 230);
+                    bool n = ty == 0 || ZoneOwner[(ty - 1) * Town.Cols + tx] != o, s2 = ty == Town.Rows - 1 || ZoneOwner[(ty + 1) * Town.Cols + tx] != o;
+                    bool w = tx == 0 || ZoneOwner[ty * Town.Cols + tx - 1] != o, ea = tx == Town.Cols - 1 || ZoneOwner[ty * Town.Cols + tx + 1] != o;
+                    for (int sy = 0; sy < ZoneScale; sy++)
+                        for (int sx = 0; sx < ZoneScale; sx++)
+                        {
+                            int px = tx * ZoneScale + sx, py = ty * ZoneScale + sy;
+                            int i = (H - 1 - py) * W + px;   // textures are bottom-up
+                            fill[i] = f;
+                            bool line = (n && sy == 0) || (s2 && sy == ZoneScale - 1) || (w && sx == 0) || (ea && sx == ZoneScale - 1);
+                            // a dashed line, like a map's boundary
+                            if (line && ((px + py) / 2) % 3 != 2) edge[i] = e;
+                        }
+                }
+            zoneFillTex.SetPixels32(fill); zoneFillTex.Apply(false);
+            zoneEdgeTex.SetPixels32(edge); zoneEdgeTex.Apply(false);
         }
 
         public void ShowGhost(BuildingType type, int tx, int ty, bool ok)

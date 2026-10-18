@@ -30,6 +30,8 @@ namespace MedievalTown.Game
         public ToolKind Tool { get; private set; }
         public BuildingType BuildType { get; private set; }
         public Selection Selected { get; set; }
+        /// <summary>The zone-of-control map view: every village's land tinted in its lord's colour.</summary>
+        public bool ZoneView;
 
         /// <summary>Tile under the mouse.</summary>
         public Vector2Int HoverTile { get; private set; }
@@ -135,6 +137,7 @@ namespace MedievalTown.Game
             if (Input.GetKeyDown(KeyCode.Q)) SetTool(ToolKind.Inspect);
             if (Input.GetKeyDown(KeyCode.R)) SetTool(ToolKind.Build, BuildingType.Road);
             if (Input.GetKeyDown(KeyCode.X)) SetTool(ToolKind.Clear);
+            if (Input.GetKeyDown(KeyCode.Z)) ZoneView = !ZoneView;
             if (Input.GetKeyDown(KeyCode.Alpha1)) SetSpeed(Speeds[1]);
             if (Input.GetKeyDown(KeyCode.Alpha2)) SetSpeed(Speeds[2]);
             if (Input.GetKeyDown(KeyCode.Alpha3)) SetSpeed(Speeds[3]);

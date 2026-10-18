@@ -72,6 +72,7 @@ namespace MedievalTown.Game
             StoresBar();
             Alerts();
             PurseAndBooks();
+            ZoneLabels();
             Hotbar();
             Minimap();
             Messages();
@@ -350,6 +351,10 @@ namespace MedievalTown.Game
         {
             var r = Block(new Rect(4, H - 4 - (MiniH + 16), MiniW + 16, MiniH + 16));
             Ui.Panel(r);
+            // the zone-of-control toggle sits on the minimap's top edge
+            var zb = Block(new Rect(r.x + 8, r.y - 15, 70, 14));
+            if (Ui.Button(zb, "Zones (Z)", gc.ZoneView)) Later(() => { gc.ZoneView = !gc.ZoneView; miniTimer = 0; });
+            if (Ui.Hover(zb)) hoverTip = "Zones of control\nEach village's land, coloured by its lord: gold for the crown, a colour for each baron. Click a village cross to see just its land.";
             if (minimap == null || miniVersion != T.MapVersion || miniSeason != T.Season) RebuildMinimap();
             miniTimer -= Time.unscaledDeltaTime;
             if (miniTimer <= 0 && Event.current.type == EventType.Repaint)
@@ -363,6 +368,21 @@ namespace MedievalTown.Game
                     if (!gc.View.TryGetPersonPos(p.Id, out pos)) continue;
                     int x = Mathf.Clamp((int)(pos.x / 16), 0, w - 1), y = Mathf.Clamp((int)(pos.y / 16), 0, h - 1);
                     px[(h - 1 - y) * w + x] = PixelCanvas.C(NatureArt.RankColor[p.Rank]);
+                }
+                if (gc.ZoneView && gc.View.ZoneOwner != null)
+                {
+                    // the zone map: each village's land in its lord's colour
+                    var own = gc.View.ZoneOwner;
+                    var cols = T.Villages.ToDictionary(vv => vv.Id, vv => WorldView.LiegeColour(T, vv));
+                    for (int y = 0; y < Town.Rows && y < h; y++)
+                        for (int x = 0; x < Town.Cols && x < w; x++)
+                        {
+                            int ow = own[y * Town.Cols + x]; Color32 c;
+                            if (ow < 0 || !cols.TryGetValue(ow, out c)) continue;
+                            int i = (h - 1 - y) * w + x;
+                            bool edge = x == 0 || y == 0 || x == Town.Cols - 1 || y == Town.Rows - 1 || own[y * Town.Cols + x - 1] != ow || own[y * Town.Cols + x + 1] != ow || own[(y - 1) * Town.Cols + x] != ow || own[(y + 1) * Town.Cols + x] != ow;
+                            px[i] = edge ? c : Color32.Lerp(px[i], c, 0.45f);
+                        }
                 }
                 minimap.SetPixels32(px); minimap.Apply(false);
             }
@@ -379,6 +399,29 @@ namespace MedievalTown.Game
             {
                 gc.CenterOn(new Vector2((e.mousePosition.x - inner.x) / sx, (e.mousePosition.y - inner.y) / sy));
                 e.Use();
+            }
+        }
+
+        /// <summary>Over each village whose zone is on show: its name and its lord.</summary>
+        void ZoneLabels()
+        {
+            var shown = gc.View.ZoneShown;
+            if (shown.Count == 0) return;
+            var o = gc.Rig.ViewOrigin; float z = gc.Rig.Zoom;
+            foreach (var id in shown)
+            {
+                var v = T.GetVillage(id); var c = T.CrossOf(v); if (c == null) continue;
+                float px = (c.X + 1) * 16, py = c.Y * 16 - BuildingArt.LiftOf(c.Type) - 6;
+                float gx = (px - o.x) * z / S, gy = (py - o.y) * z / S;
+                if (gx < -60 || gy < -30 || gx > W + 60 || gy > H + 30) continue;
+                string l1 = v.Name + (v.Capital ? " (capital)" : ""), l2 = T.LiegeName(v) + " · " + T.PopulationOf(v) + " folk";
+                float w = Mathf.Max(PixelFont.Width(l1), PixelFont.Width(l2)) + 12;
+                var r = new Rect(Mathf.Round(gx - w / 2), Mathf.Round(gy - 26), w, 25);
+                var lc = WorldView.LiegeColour(T, v);
+                Ui.Tip(r);
+                Ui.Fill(new Rect(r.x + 1, r.y + 1, 3, r.height - 2), lc);
+                Ui.Text(r.x + 7, r.y + 4, l1, Ui.Title);
+                Ui.Text(r.x + 7, r.y + 14, l2, Ui.InkSoft);
             }
         }
 
