@@ -36,7 +36,7 @@ namespace MedievalTown.Simulation
         public void PlanDay()
         {
             foreach (var p in People) { p.Chore = Chore.None; p.TaskId = -1; }
-            var sites = Sites.Where(SiteCanProgress).OrderBy(s => s.Type == BuildingType.Road ? 9 : s.Def.IsField ? 0 : s.Type == BuildingType.Granary ? 1 : s.Type == BuildingType.Mill ? 2 : s.Type == BuildingType.Cottage ? 3 : 4).ThenBy(s => s.Id).ToList();
+            var sites = Sites.Where(SiteCanProgress).OrderBy(s => s.Type == BuildingType.Road ? 9 : s.Def.IsWall ? 6 : s.Def.IsField ? 0 : s.Type == BuildingType.Granary ? 1 : s.Type == BuildingType.Mill ? 2 : s.Type == BuildingType.Cottage ? 3 : 4).ThenBy(s => s.Id).ToList();
             var crew = sites.ToDictionary(s => s.Id, s => 0);
             var demesnes = OfType(BuildingType.Demesne).Where(FieldNeedsWork).ToList();
             // sites waiting on timber or stone the stores don't have: week-work goes to the quarry and the woods
@@ -101,11 +101,9 @@ namespace MedievalTown.Simulation
                     var s = nextSite();
                     if (s != null) { p.Chore = Chore.Build; p.TaskId = s.Id; continue; }
                     var mat = quarry != null && woods != null ? (mc++ % 2 == 0 ? quarry : woods) : quarry ?? woods;
-                    // at harvest the king's field comes first; while the crop grows, hands are split with the carting
-                    bool harvest = Season == 2;
-                    if (demesnes.Count > 0 && (mat == null || harvest || (p.Id % 2 == 0))) { p.Chore = Chore.WeekWork; p.TaskId = demesnes[dc++ % demesnes.Count].Id; continue; }
                     if (mat != null) { p.Chore = Chore.WeekWork; p.TaskId = mat.Id; continue; }
-                    if (IsWeekWorkDay) { p.Chore = Chore.WeekWork; p.TaskId = -1; continue; }   // gathering wood for the king
+                    // gathering wood for the king's fires, if the stores want it; otherwise the reeve lets them go to their strips
+                    if (IsWeekWorkDay && StoreStock(Good.Firewood) < 150) { p.Chore = Chore.WeekWork; p.TaskId = -1; continue; }
                 }
                 var strip = StripOf(p);
                 if (strip != null && FieldNeedsWork(strip)) { p.Chore = Chore.OwnStrip; p.TaskId = strip.Id; continue; }
@@ -142,7 +140,7 @@ namespace MedievalTown.Simulation
                 var t = GetBuilding(p.TaskId);
                 switch (p.Chore)
                 {
-                    case Chore.OwnStrip: if (t != null) FieldWork(t, hands, 1f, HomeOf(GetCitizen(t.HolderId) ?? p)); break;
+                    case Chore.OwnStrip: if (t != null) FieldWork(t, hands, reeve, HomeOf(GetCitizen(t.HolderId) ?? p)); break;
                     case Chore.WeekWork:
                         if (t != null && t.Def.IsField) FieldWork(t, hands, reeve, null);
                         else if (t != null) Materials(t, hands);
@@ -572,7 +570,7 @@ namespace MedievalTown.Simulation
                 if (p.HomeId < 0) target -= 15;
                 if (p.Rank == Rank.Serf || p.Rank == Rank.Reeve) target -= Policy.WeekWork * 5 - 5;   // two days is custom; more is a burden
                 if (p.Rank == Rank.Freeman) target -= Math.Max(0, Policy.Rent - 1) * 6;
-                target -= Math.Max(0, Policy.HarvestTax - 0.15f) * 60 + Math.Max(0, Policy.HearthTax - 0.1f) * 20;   // taxes above custom sting
+                target -= Math.Max(0, Policy.HarvestTax - 0.3f) * 60 + Math.Max(0, Policy.HearthTax - 0.1f) * 20;   // taxes above custom sting
                 var hh = HomeOf(p); if (hh != null && hh.Arrears > 0.5f) target -= 6;
                 target += (p.Piety - 40) * 0.2f;
                 if (Day - p.AleDay < 7) target += 4;
@@ -651,6 +649,16 @@ namespace MedievalTown.Simulation
                 q = TakeFromStores(Good.Firewood, q);
                 payer.Coin -= q * Balance.FirewoodPrice; Coin += q * Balance.FirewoodPrice; WeekIn += q * Balance.FirewoodPrice;
                 h.Stock[(int)Good.Firewood] += q;
+            }
+            // the crown buys grain when the granary won't feed the court until harvest
+            {
+                float want = HouseholdKeep + 30 - StoreStock(Good.Grain);
+                float q = (float)Math.Floor(Math.Min(Math.Min(want, 120f), (Coin - Policy.CoinReserve * 0.5f) / Balance.BuyGrain));
+                if (q >= 5)
+                {
+                    Coin -= q * Balance.BuyGrain; WeekOut += q * Balance.BuyGrain; PutInStores(Good.Grain, q);
+                    AddLog("Market day: the crown bought " + q + " measures of grain from the merchant for " + Money(q * Balance.BuyGrain) + ".", LogKind.Info);
+                }
             }
             // freemen buy grain for the coming weeks
             foreach (var h in Buildings.Where(b => b.Built && b.Type == BuildingType.FreeHouse && b.Residents.Count > 0))

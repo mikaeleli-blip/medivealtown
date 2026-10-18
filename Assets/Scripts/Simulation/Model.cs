@@ -38,6 +38,7 @@ namespace MedievalTown.Simulation
         // Taxes: what a household owes and hasn't yet handed to the reeve; the coin in the bailiff's chest
         public float OwedGrain, OwedCoin, Arrears;
         public float Coin;
+        public int Mask;                 // walls: which neighbours they join (1 north, 2 east, 4 south, 8 west)
 
         public BuildingDef Def { get { return Defs.Get(Type); } }
         public bool Contains(int tx, int ty)
@@ -79,6 +80,7 @@ namespace MedievalTown.Simulation
         public float Loyalty = Balance.LoyaltyStart;   // to the lord of the manor
         public float Piety = 40f;
         public float Coin;
+        public int Mask;                 // walls: which neighbours they join (1 north, 2 east, 4 south, 8 west)
         public float Seed;               // 0..1, drives looks and small quirks
         public int ArrivedDay;
         public int MassDay = -999;       // last Sunday at mass
@@ -95,7 +97,7 @@ namespace MedievalTown.Simulation
     public class ManorPolicy
     {
         public int WeekWork = 2;           // days a week each serf owes on the king's land
-        public float HarvestTax = 0.15f;   // share of every strip's harvest owed in grain
+        public float HarvestTax = 0.3f;    // share of every strip's harvest owed in grain
         public float HearthTax = 0.1f;     // coin per household per week
         public float Rent = 1f;            // coin per freeman household per week, on top of the hearth tax
         public float Tallage = 1f;         // coin per serf household, assessed at Martinmas (start of winter)

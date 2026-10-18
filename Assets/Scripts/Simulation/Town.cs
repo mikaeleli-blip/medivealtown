@@ -304,10 +304,25 @@ namespace MedievalTown.Simulation
             if (b.Built) { b.Progress = d.Work; b.Delivered[(int)Good.Timber] = d.Timber; b.Delivered[(int)Good.Stone] = d.Stone; }
             Buildings.Add(b);
             MarkDirty(b);
+            if (d.IsWall) RemaskWalls(b);
             if (b.Built) OnBuilt(b, free);
             else AddLog("The reeve staked out a " + d.Name + ". It needs " + MaterialsText(d) + " and " + d.Work + " days of labour.", LogKind.Build);
             return b;
         }
+
+        /// <summary>Walls join their neighbours: each wall tile records which sides have a wall, tower or gatehouse next to it.</summary>
+        void RemaskWalls(Building around)
+        {
+            var d = around.Def;
+            for (int y = around.Y - 1; y <= around.Y + d.H; y++)
+                for (int x = around.X - 1; x <= around.X + d.W; x++)
+                {
+                    var w = OccupantAt(x, y);
+                    if (w == null || w.Type != BuildingType.Wall) continue;
+                    w.Mask = WallAt(x, y - 1, w) * 1 + WallAt(x + 1, y, w) * 2 + WallAt(x, y + 1, w) * 4 + WallAt(x - 1, y, w) * 8;
+                }
+        }
+        int WallAt(int x, int y, Building self) { var o = OccupantAt(x, y); return o != null && o != self && o.Def.IsWall ? 1 : 0; }
 
         public static string MaterialsText(BuildingDef d)
         {
@@ -364,6 +379,7 @@ namespace MedievalTown.Simulation
             }
             Buildings.Remove(b);
             MarkDirty(b);
+            if (d.IsWall) RemaskWalls(b);
             // half the materials come back, and whatever was kept here
             PutInStores(Good.Timber, b.Delivered[(int)Good.Timber] * 0.5f);
             PutInStores(Good.Stone, b.Delivered[(int)Good.Stone] * 0.5f);
@@ -415,7 +431,7 @@ namespace MedievalTown.Simulation
             t.ChurchName = t.Pick(Defs.Saints) + "'s";
 
             // clear the old village ground
-            for (int y = TrailRow - 9; y <= TrailRow + 6; y++)
+            for (int y = TrailRow - 9; y <= TrailRow + 11; y++)
                 for (int x = VillageX - 3; x <= VillageX + 26; x++)
                     if (t.TerrainAt(x, y) != Tile.OutOfBounds) t.Terrain[y * Cols + x] = Tile.Grass;
             // the old track through it
@@ -453,7 +469,7 @@ namespace MedievalTown.Simulation
             for (int i = 0; i < 6; i++)
             {
                 var home = t.Place(BuildingType.Cottage, VillageX + i * 3, TrailRow - 3, out err, true);
-                var strip = t.Place(BuildingType.Strip, VillageX - 1 + i * 4, TrailRow + 2, out err, true);
+                var strip = t.Place(BuildingType.Strip, VillageX - 1 + (i % 3) * 6, TrailRow + 2 + (i / 3) * 5, out err, true);
                 string fam = t.Pick(Defs.PeasantNames);
                 var dad = t.AddPerson(false, fam, t.Rnd(22, 44), Rank.Serf);
                 var mom = t.AddPerson(true, fam, t.Rnd(19, 38), Rank.Serf);
@@ -489,7 +505,7 @@ namespace MedievalTown.Simulation
             t.AddLog(t.Title(lord) + " of the house of " + t.Dynasty + " has come to " + t.ManorName + " to make it the seat of his kingdom.", LogKind.Crown);
             t.AddLog("The village has six serf families, two freemen and an old track. There is no keep, no church and no mill.", LogKind.Info);
             t.AddLog("Taxes climb the chain: every Friday the reeve collects from each household and carries it to " + t.Title(bailiff) + ", the king's bailiff, who brings it to the king on Saturday. Each keeps a share.", LogKind.Crown);
-            t.AddLog("Serfs owe the king " + t.Policy.WeekWork + " days' work a week. Stake out a Royal Demesne and a Granary first, then the Bailiff's Hall, the Castle and the Church.", LogKind.Info);
+            t.AddLog("Serfs owe the king " + t.Policy.WeekWork + " days' work a week. Stake out a Granary first, then the Bailiff's Hall, the Castle and the Church.", LogKind.Info);
             return t;
         }
 

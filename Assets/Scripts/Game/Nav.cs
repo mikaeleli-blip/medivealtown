@@ -26,6 +26,7 @@ namespace MedievalTown.Game
                     var b = town.OccupantAt(x, y);
                     float c;
                     if (b != null && b.Type == BuildingType.Road) c = 1f;
+                    else if (b != null && b.Type == BuildingType.Gatehouse && b.Built) c = 1.2f;
                     else if (b != null && (b.Def.IsField || !b.Built)) c = 2.5f;
                     else if (b != null) c = -1f;
                     else if (t == Tile.Water) c = AdjacentFishery(x, y) ? 2f : -1f;

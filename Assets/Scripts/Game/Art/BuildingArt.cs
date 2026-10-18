@@ -44,7 +44,7 @@ namespace MedievalTown.Game.Art
             {
                 case BuildingType.Cottage: return 8;
                 case BuildingType.FreeHouse: return 18;
-                case BuildingType.Keep: return 46;
+                case BuildingType.Keep: return 58;
                 case BuildingType.Church: return 38;
                 case BuildingType.Granary: return 16;
                 case BuildingType.Woodcutter: return 10;
@@ -54,11 +54,14 @@ namespace MedievalTown.Game.Art
                 case BuildingType.Pavilion: return 18;
                 case BuildingType.Cart: return 8;
                 case BuildingType.BailiffHall: return 20;
+                case BuildingType.Wall: return 14;
+                case BuildingType.WallTower: return 26;
+                case BuildingType.Gatehouse: return 24;
                 default: return 0;
             }
         }
 
-        public static int VariantOf(Building b) { return b.Type == BuildingType.Cottage || b.Type == BuildingType.FreeHouse ? b.Id % 3 : 0; }
+        public static int VariantOf(Building b) { return b.Type == BuildingType.Cottage || b.Type == BuildingType.FreeHouse ? b.Id % 3 : b.Type == BuildingType.Wall ? b.Mask & 15 : 0; }
 
         static readonly Dictionary<int, BuildingSprites> cache = new Dictionary<int, BuildingSprites>();
         public static BuildingSprites Get(BuildingType type, int variant, int season)
@@ -242,6 +245,9 @@ namespace MedievalTown.Game.Art
                 case BuildingType.Pavilion: Pavilion(k); break;
                 case BuildingType.Cart: Wagon(k); break;
                 case BuildingType.BailiffHall: BailiffHall(k); break;
+                case BuildingType.Wall: Wall(k); break;
+                case BuildingType.WallTower: WallTower(k); break;
+                case BuildingType.Gatehouse: Gatehouse(k); break;
             }
             k.Tg.Outline(OL);
             string n = type + "_" + v + "_" + si;

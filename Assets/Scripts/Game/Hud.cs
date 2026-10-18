@@ -199,7 +199,6 @@ namespace MedievalTown.Game
             if (homeless > 0 && si >= 1) lines.Add(new KeyValuePair<string, bool>(homeless + " in tents. Build cottages before " + (si == 1 ? "autumn." : "the cold kills them."), si >= 2));
             int noStrip = T.Buildings.Count(b => { if (!b.Built || b.Type != BuildingType.Cottage || b.Residents.Count == 0) return false; var hd = T.HeadOf(b); return hd != null && hd.Rank != Rank.Freeman && T.StripOf(hd) == null; });
             if (noStrip > 0) lines.Add(new KeyValuePair<string, bool>((noStrip == 1 ? "A serf family has" : noStrip + " serf families have") + " no strip field. They'll go hungry.", true));
-            if (!T.OfType(BuildingType.Demesne).Any() && !T.Sites.Any(s => s.Type == BuildingType.Demesne)) lines.Add(new KeyValuePair<string, bool>("No royal demesne: the court has nothing to eat once the stores run out.", true));
             float need = T.HouseholdKeep;
             if (si <= 1 && need > 0 && T.StoreStock(Good.Grain) < need * 0.9f) lines.Add(new KeyValuePair<string, bool>("The granary won't feed the court until harvest.", T.StoreStock(Good.Grain) < need * 0.5f));
             if (T.Bailiff == null) lines.Add(new KeyValuePair<string, bool>("No bailiff: the reeve carries the taxes to the castle himself until a new one comes.", false));
@@ -599,7 +598,7 @@ namespace MedievalTown.Game
             var pol = T.Policy;
             Heading("Taxes");
             pol.HarvestTax = SliderRow("Harvest tax", Mathf.RoundToInt(pol.HarvestTax * 100) + "% of each strip", pol.HarvestTax, 0, 0.5f, 0.01f,
-                "The crown's share of every family's harvest, in grain. Above 15% the village feels it.");
+                "The crown's share of every family's harvest, in grain. It's what feeds the court. Above 30% the village feels it.");
             pol.HearthTax = SliderRow("Hearth tax", M(pol.HearthTax) + " a house a week", pol.HearthTax, 0, 1f, 0.05f,
                 "Coin from every household. Serfs have little coin; the reeve takes grain instead when they can't pay.");
             pol.Tallage = SliderRow("Tallage", M(pol.Tallage) + " a serf family", pol.Tallage, 0, 5, 0.5f,

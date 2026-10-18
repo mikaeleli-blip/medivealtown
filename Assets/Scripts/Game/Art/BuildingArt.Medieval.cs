@@ -211,55 +211,183 @@ namespace MedievalTown.Game.Art
             Foundation(tg, 3, y0 + 44, 26);
         }
 
-        /// <summary>The lord's seat: a square stone keep with battlements and the lord's banner, and the great hall beside it.</summary>
+        /// <summary>The royal castle: a great square keep with corner turrets and the king's banner, a great hall with tall windows,
+        /// barracks and stables, round towers and a curtain wall behind, and a courtyard with a well.</summary>
         static void Keep(Ctx k)
         {
             var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int si = k.Si; int y0 = k.Y(0);
-            // the bailey: a packed-earth yard, a stone path to the door
-            bg.R(0, y0 + 4, 64, 60, W ? "#e4e0d8" : "#b8a07a");
-            for (int i = 0; i < 90; i++) bg.D((int)(Hs(i, 31, 3) * 64), y0 + 4 + (int)(Hs(31, i, 4) * 60), W ? "#d0ccc2" : (i % 3 == 0 ? "#a08a64" : "#c8b088"));
-            for (int y = y0 + 52; y < y0 + 64; y += 3) for (int x = 15; x < 25; x += 4) { bg.R(x + (y % 2) * 2, y, 3, 2, "#a39c90"); bg.D(x + (y % 2) * 2, y, "#bdb6aa"); }
-            // grass round the edges
+            int Wd = k.W;
+            // the bailey: a packed-earth courtyard, a stone path from the front to the keep's stairs
+            bg.R(0, y0 + 8, Wd, 88, W ? "#e4e0d8" : "#b8a07a");
+            for (int i = 0; i < 260; i++) bg.D((int)(Hs(i, 31, 3) * Wd), y0 + 8 + (int)(Hs(31, i, 4) * 88), W ? "#d0ccc2" : (i % 3 == 0 ? "#a08a64" : "#c8b088"));
+            for (int y = y0 + 80; y < y0 + 96; y += 3) for (int x = 48; x < 64; x += 4) { bg.R(x + (y % 2) * 2, y, 3, 2, StoneC[0]); bg.D(x + (y % 2) * 2, y, StoneC[2]); }
             string[] lawn = { "#7fbe55", "#6fae48", "#a6a052", SNOW };
-            bg.R(0, y0 + 60, 64, 4, lawn[si]);
+            bg.R(0, y0 + 92, Wd, 4, lawn[si]);
 
-            // the great hall, behind and to the right
-            Shadow(tg, 30, y0 + 51, 32);
-            Shingles(tg, 28, y0 + 6, 35, 18, Slate, W);
-            Chimney(k, 52, y0 - 1, 9);
-            Stone(tg, 30, y0 + 24, 31, 28, StoneWarm);
-            tg.R(30, y0 + 24, 31, 2, StoneWarm[1]);
-            Lancet(k, 34, y0 + 30, 3, 9, false, StoneWarm[2]); Lancet(k, 41, y0 + 30, 3, 9, false, StoneWarm[2]);
-            Lancet(k, 48, y0 + 30, 3, 9, false, StoneWarm[2]); Lancet(k, 55, y0 + 30, 3, 9, false, StoneWarm[2]);
-            tg.R(30, y0 + 50, 31, 2, StoneWarm[3]);
+            // the back curtain wall and its two round towers
+            Stone(tg, 8, y0 + 2, Wd - 16, 20, StoneC);
+            tg.R(8, y0 + 20, Wd - 16, 2, StoneC[3]);
+            Merlons(tg, 8, y0 + 2, Wd - 16, StoneC, W);
+            foreach (int cx in new[] { 8, Wd - 8 }) RoundTower(tg, cx, y0 - 14, y0 + 26, 8, W);
 
-            // the keep tower
-            int tx = 4, tw = 28, ttop = y0 - 40;
-            Shadow(tg, tx, y0 + 55, tw);
-            Stone(tg, tx, ttop, tw, y0 + 55 - ttop, StoneC);
-            tg.R(tx + tw - 4, ttop, 4, y0 + 55 - ttop, StoneC[1]);       // the shaded east face
-            for (int y = ttop + 2; y < y0 + 55; y += 4) tg.D(tx + tw - 3, y, StoneC[3]);
+            // barracks and stables on the left
+            Shadow(tg, 6, y0 + 69, 34);
+            Thatch(tg, 4, y0 + 34, 38, 16, W, ThatchOld, 5);
+            Daub(tg, 6, y0 + 49, 34, 20, Daubs[1]);
+            for (int x = 12; x < 38; x += 8) tg.R(x, y0 + 50, 1, 18, TIMBERDARK);
+            Shutter(k, 10, y0 + 54, 3, 3, false); Shutter(k, 31, y0 + 54, 3, 3, true);
+            tg.R(18, y0 + 56, 8, 12, "#3a2618"); tg.R(18, y0 + 56, 8, 1, TIMBERDARK); tg.R(22, y0 + 56, 1, 12, "#5a3a22");   // the stable door, open
+            tg.R(19, y0 + 62, 3, 6, "#c8a050");   // hay inside
+
+            // the great hall on the right
+            Shadow(tg, 68, y0 + 71, 38);
+            Shingles(tg, 66, y0 + 14, 42, 22, Slate, W);
+            Chimney(k, 98, y0 + 6, 10);
+            Stone(tg, 68, y0 + 36, 38, 35, StoneWarm);
+            tg.R(68, y0 + 36, 38, 2, StoneWarm[1]);
+            foreach (int lx in new[] { 74, 83, 92, 100 }) Lancet(k, lx, y0 + 44, 3, 12, false, StoneWarm[2]);
+            tg.R(68, y0 + 69, 38, 2, StoneWarm[3]);
+            ArchDoor(k, 86, y0 + 60, 5, 9, "#5a3420", StoneWarm[2]);
+            k.M.Door = new RectInt(0, 0, 0, 0); k.M.HasDoor = false;   // the keep's door is the one folk use
+
+            // the great keep
+            int tx = 36, tw = 36, ttop = y0 - 50, tbot = y0 + 78;
+            Shadow(tg, tx, tbot, tw);
+            Stone(tg, tx, ttop, tw, tbot - ttop, StoneC);
+            tg.R(tx + tw - 5, ttop, 5, tbot - ttop, StoneC[1]);
+            for (int y = ttop + 2; y < tbot; y += 4) tg.D(tx + tw - 4, y, StoneC[3]);
+            tg.R(tx, ttop, 2, tbot - ttop, StoneC[2]);
             Merlons(tg, tx - 1, ttop, tw + 2, StoneC, W);
-            // corner turret corbels
-            tg.R(tx - 2, ttop + 2, 3, 3, StoneC[1]); tg.R(tx + tw - 1, ttop + 2, 3, 3, StoneC[3]);
-            // string courses
-            tg.R(tx, ttop + 22, tw, 1, StoneC[2]); tg.R(tx, ttop + 46, tw, 1, StoneC[2]);
-            // arrow slits and windows
-            foreach (int sy in new[] { ttop + 8, ttop + 30 })
-                foreach (int sx in new[] { tx + 6, tx + 19 })
+            // corner turrets corbelled out, with slate caps
+            foreach (int cx in new[] { tx, tx + tw })
+            {
+                tg.R(cx - 4, ttop - 6, 8, 14, StoneC[0]); tg.R(cx + 1, ttop - 6, 3, 14, StoneC[1]);
+                for (int r = 0; r < 4; r++) tg.R(cx - 3 + r, ttop + 8 + r, 6 - r * 2, 1, StoneC[1]);
+                for (int r = 0; r < 9; r++) { int hw = 1 + r / 2; tg.R(cx - hw, ttop - 15 + r, hw * 2, 1, r % 3 == 0 ? Slate[2] : Slate[0]); tg.D(cx + hw - 1, ttop - 15 + r, Slate[1]); }
+                if (W) tg.R(cx - 2, ttop - 13, 3, 2, SNOW);
+                tg.R(cx, ttop - 18, 1, 3, "#c89a3a");
+            }
+            // string courses, arrow slits, a great window
+            tg.R(tx, ttop + 28, tw, 1, StoneC[2]); tg.R(tx, ttop + 64, tw, 1, StoneC[2]); tg.R(tx, ttop + 96, tw, 1, StoneC[2]);
+            foreach (int sy in new[] { ttop + 10, ttop + 40, ttop + 74 })
+                foreach (int sx in new[] { tx + 8, tx + 26 })
                 {
-                    tg.R(sx, sy, 1, 7, "#2a1a10"); tg.R(sx - 1, sy + 3, 3, 1, "#2a1a10");
+                    tg.R(sx, sy, 1, 8, "#2a1a10"); tg.R(sx - 1, sy + 3, 3, 1, "#2a1a10");
+                    k.Glow.Add(new RectInt(sx, sy, 1, 8));
                 }
-            Lancet(k, tx + 11, ttop + 26, 5, 8, false, StoneC[2]);
-            k.Glow.Add(new RectInt(tx + 6, ttop + 8, 1, 7)); k.Glow.Add(new RectInt(tx + 19, ttop + 8, 1, 7));
-            // the forebuilding: steps up to the door
-            Stone(tg, tx + 7, y0 + 40, 14, 15, StoneC);
-            ArchDoor(k, tx + 11, y0 + 44, 6, 10, "#5a3420", StoneC[2]);
-            for (int i = 0; i < 3; i++) tg.R(tx + 9 - i, y0 + 55 + i, 10 + i * 2, 1, i % 2 == 0 ? StoneC[2] : StoneC[1]);
+            Lancet(k, tx + 15, ttop + 36, 6, 14, true, StoneC[2]);
+            Lancet(k, tx + 16, ttop + 72, 4, 9, false, StoneC[2]);
+            // the forebuilding and stairs up to the door
+            Stone(tg, tx + 8, y0 + 58, 20, 20, StoneC);
+            Merlons(tg, tx + 8, y0 + 58, 20, StoneC, W);
+            ArchDoor(k, tx + 15, y0 + 64, 7, 12, "#5a3420", StoneC[2]);
+            for (int i = 0; i < 4; i++) tg.R(tx + 12 - i, y0 + 78 + i, 13 + i * 2, 1, i % 2 == 0 ? StoneC[2] : StoneC[1]);
             // the banner pole on the roof
-            tg.R(tx + tw / 2, ttop - 16, 1, 12, "#5a3a22");
-            tg.D(tx + tw / 2, ttop - 17, "#e0b04a");
-            k.M.BannerAt = new Vector2(tx + tw / 2 + 1, ttop - 15);
+            tg.R(tx + tw / 2, ttop - 20, 1, 16, "#5a3a22");
+            tg.D(tx + tw / 2, ttop - 21, "#e0b04a");
+            k.M.BannerAt = new Vector2(tx + tw / 2 + 1, ttop - 19);
+
+            // the courtyard: a well, barrels and hay
+            int wx = 18, wy = y0 + 82;
+            tg.Ellipse(wx, wy, 6, 3, PixelCanvas.C(StoneC[0])); tg.Ellipse(wx, wy - 1, 4, 2, PixelCanvas.C("#2a3a4a"));
+            tg.R(wx - 6, wy - 12, 1, 11, TIMBERMID); tg.R(wx + 5, wy - 12, 1, 11, TIMBERMID);
+            for (int r = 0; r < 4; r++) tg.R(wx - 7 + r, wy - 15 + r, 14 - r * 2, 1, ThatchC[r % 2]);
+            tg.R(wx - 5, wy - 9, 10, 1, "#5a3a22"); tg.R(wx, wy - 8, 1, 4, "#d6ccb6"); tg.R(wx - 1, wy - 4, 3, 2, "#8a5a34");
+            Barrel(tg, 96, y0 + 80); Barrel(tg, 102, y0 + 81); Crate(tg, 90, y0 + 82);
+            tg.R(28, y0 + 76, 8, 5, ThatchC[0]); tg.R(28, y0 + 76, 8, 1, ThatchC[2]);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A round stone tower: shaded like a drum, coursed, with battlements round the top.</summary>
+        static void RoundTower(PixelCanvas g, int cx, int top, int bot, int r, bool winter)
+        {
+            for (int x = cx - r; x < cx + r; x++)
+            {
+                float t = (x + 0.5f - cx) / r;          // -1 left .. 1 right
+                string c = t < -0.6f ? StoneC[1] : t < 0.2f ? StoneC[0] : t < 0.6f ? StoneC[2] : StoneC[1];
+                if (t > 0.75f) c = StoneC[3];
+                int curve = Mathf.RoundToInt((1 - Mathf.Sqrt(Mathf.Max(0, 1 - t * t))) * 2);
+                g.R(x, top + curve, 1, bot - top - curve, c);
+                for (int y = top + curve + 3; y < bot; y += 4) g.D(x, y + ((x / 4) % 2), StoneC[1]);
+            }
+            // walkway and merlons round the top
+            g.Ellipse(cx - 0.5f, top, r, 2.5f, PixelCanvas.C(StoneC[2]));
+            for (int x = cx - r; x < cx + r; x += 4) { int mw = Mathf.Min(2, cx + r - x); g.R(x, top - 4, mw, 4, StoneC[0]); g.D(x, top - 4, StoneC[2]); if (winter) g.D(x, top - 5, SNOW); }
+            if (winter) g.R(cx - r + 1, top - 1, r * 2 - 2, 1, SNOW);
+            // arrow slits
+            g.R(cx - 1, top + 8, 1, 6, "#2a1a10"); g.R(cx - 1, top + (bot - top) / 2 + 2, 1, 6, "#2a1a10");
+        }
+
+        // ================================================================== walls
+        /// <summary>A stretch of curtain wall, joined to whichever neighbours are walls, towers or gatehouses.
+        /// Mask bits: 1 north, 2 east, 4 south, 8 west.</summary>
+        static void Wall(Ctx k)
+        {
+            var tg = k.Tg; bool W = k.Winter; int m = k.V; int y0 = k.Y(0);
+            bool n = (m & 1) != 0, e = (m & 2) != 0, s = (m & 4) != 0, w = (m & 8) != 0;
+            const int faceTop = -2, faceH = 16;   // relative to y0: the front face of a wall running east-west
+            // a wall running north-south: its walkway seen from above, edged with merlons
+            if (n || s)
+            {
+                int ya = n ? 0 : y0 - 6, yb = s ? k.H : y0 + faceTop;
+                tg.R(4, ya, 8, yb - ya, StoneC[2]);
+                for (int y = ya; y < yb; y++) { tg.D(4, y, StoneC[1]); tg.D(11, y, StoneC[3]); if (y % 4 == 0) tg.D(5 + (y / 4) % 6, y, StoneC[0]); }
+                for (int y = ya + 1; y < yb - 1; y += 4) { tg.R(3, y, 2, 2, StoneC[0]); tg.R(11, y, 2, 2, StoneC[1]); if (W) { tg.D(3, y - 1, SNOW); tg.D(12, y - 1, SNOW); } }
+                if (W) for (int y = ya; y < yb; y++) if (Hs(y, 3, 2) < 0.4f) tg.D(6 + (int)(Hs(y, 4, 2) * 4), y, SNOW);
+            }
+            // a wall running east-west (or a lone stub): the front face with its battlements
+            if (e || w || !(n || s) || !s)
+            {
+                int xa = w ? 0 : 4, xb = e ? 16 : 12;
+                if (!(e || w) && (n || s)) { xa = 4; xb = 12; }
+                Stone(tg, xa, y0 + faceTop, xb - xa, faceH, StoneC);
+                tg.R(xa, y0 + faceTop + faceH - 2, xb - xa, 2, StoneC[3]);
+                tg.R(xa, y0 + faceTop - 4, xb - xa, 4, StoneC[2]);   // the walkway
+                for (int x = xa; x < xb; x += 4)
+                {
+                    tg.R(x, y0 + faceTop - 8, 2, 4, StoneC[0]); tg.D(x, y0 + faceTop - 8, StoneC[2]);
+                    if (W) tg.D(x, y0 + faceTop - 9, SNOW);
+                }
+                if (W) tg.R(xa, y0 + faceTop - 4, xb - xa, 1, SNOW);
+                tg.R(xa, y0 + faceTop + 5, xb - xa, 1, StoneC[1]);
+            }
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A round wall tower, two tiles across.</summary>
+        static void WallTower(Ctx k)
+        {
+            var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            Shadow(tg, 3, y0 + 29, 26);
+            RoundTower(tg, 16, y0 - 22, y0 + 30, 13, W);
+            tg.R(14, y0 + 20, 4, 10, "#3a2618"); tg.R(14, y0 + 20, 4, 1, StoneC[2]);   // a low postern door
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>The gatehouse: twin round towers either side of an arched gate with a raised portcullis. Folk walk through it.</summary>
+        static void Gatehouse(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.R(16, y0, 16, 32, W ? "#e4e0d8" : "#a8906a");
+            for (int y = y0 + 1; y < y0 + 32; y += 3) for (int x = 17; x < 31; x += 4) { bg.R(x + (y % 2) * 2, y, 3, 2, StoneC[0]); }
+            Shadow(tg, 2, y0 + 30, 44);
+            // the gate block
+            Stone(tg, 10, y0 - 12, 28, 42, StoneC);
+            Merlons(tg, 10, y0 - 12, 28, StoneC, W);
+            // the arch
+            int ax = 17, aw = 14, atop = y0 + 8;
+            tg.R(ax, atop, aw, y0 + 30 - atop, "#2a1a10");
+            for (int i = 0; i < aw / 2; i++) tg.R(ax + i, atop - aw / 2 + i, aw - i * 2, 1, "#2a1a10");
+            tg.R(ax - 1, atop - aw / 2 - 1, aw + 2, 1, StoneC[2]);
+            // the portcullis, raised but showing its teeth
+            for (int x = ax + 1; x < ax + aw; x += 3) tg.R(x, atop - 4, 1, 8, "#5a5a62");
+            for (int y = atop - 3; y < atop + 4; y += 3) tg.R(ax + 1, y, aw - 2, 1, "#5a5a62");
+            for (int x = ax + 1; x < ax + aw; x += 3) tg.D(x, atop + 4, "#8a8e96");
+            // the twin towers
+            RoundTower(tg, 8, y0 - 20, y0 + 30, 8, W);
+            RoundTower(tg, 40, y0 - 20, y0 + 30, 8, W);
+            // the king's arms over the gate
+            tg.R(21, y0 - 6, 6, 6, "#b5432f"); tg.R(22, y0, 4, 1, "#b5432f"); tg.R(23, y0 - 6, 2, 6, "#e0b04a"); tg.R(21, y0 - 4, 6, 1, "#e0b04a");
             k.M.PileAt = new Vector2Int(-1, -1);
         }
 

@@ -178,7 +178,7 @@ namespace MedievalTown.Game
                 }
             }
 
-            bool paintTool = Tool == ToolKind.Clear || (Tool == ToolKind.Build && BuildType == BuildingType.Road);
+            bool paintTool = Tool == ToolKind.Clear || (Tool == ToolKind.Build && (BuildType == BuildingType.Road || BuildType == BuildingType.Wall));
             if (Input.GetMouseButtonDown(0) && PointerOnMap)
             {
                 dragStart = mouse; lastMouse = mouse;
@@ -209,7 +209,7 @@ namespace MedievalTown.Game
         Vector2Int Anchor(BuildingType t)
         {
             var d = Defs.Get(t);
-            if (t == BuildingType.Road) return HoverTile;
+            if (t == BuildingType.Road || t == BuildingType.Wall) return HoverTile;
             return new Vector2Int(HoverTile.x - (d.W - 1) / 2, HoverTile.y - (d.H - 1) / 2);
         }
 
@@ -259,9 +259,9 @@ namespace MedievalTown.Game
             var built = Town.Place(BuildType, a.x, a.y, out error);
             if (built == null)
             {
-                if (first && !(BuildType == BuildingType.Road && error.Contains("taken"))) Hud.Toast(error);
+                if (first && !((BuildType == BuildingType.Road || BuildType == BuildingType.Wall) && error.Contains("taken"))) Hud.Toast(error);
             }
-            else if (BuildType != BuildingType.Road) Selected = Selection.Building(built.Id);
+            else if (BuildType != BuildingType.Road && BuildType != BuildingType.Wall) Selected = Selection.Building(built.Id);
         }
 
         // ================================================================== save / load

@@ -29,19 +29,17 @@ king's bailiff arrive with a pavilion and a baggage cart.
 
 A sound opening:
 
-1. **Royal Demesne**: the king's own field. Serfs work it on their week-work days. Without it the court starves once the
-   cart's grain runs out.
-2. **Royal Granary**: the cart is unloaded into it.
-3. **Woodward's Lodge** and **Quarry**: freemen fell timber and break stone. Serfs on week-work help when sites wait.
-4. **Windmill**: everyone must grind at the king's mill and leave the crown's share. Bread goes further than pottage.
-5. **Bailiff's Hall**, the **Parish Church**, then the **Castle**.
-6. More **Cottages** and **Strip Fields** as families grow. A family without a strip goes hungry.
+1. **Royal Granary**: the cart is unloaded into it.
+2. **Woodward's Lodge** and **Quarry**: freemen fell timber and break stone. Serfs on week-work help when sites wait.
+3. **Windmill**: everyone must grind at the king's mill and leave the crown's share. Bread goes further than pottage.
+4. **Bailiff's Hall**, the **Parish Church**, then the **Castle**, and finally **walls, towers and a gatehouse** around it.
+5. More **Cottages** and **Strip Fields** as families grow. A family without a strip goes hungry.
 
 ## The tax chain
 
 Each household owes:
 
-- a **harvest tax**: a share of its strip's grain, 15% by default;
+- a **harvest tax**: a share of its strip's grain, 30% by default (this is what feeds the court; there is no royal farm);
 - a **hearth tax** in coin each week, plus rent for freemen;
 - **tallage**, laid on serf families at Martinmas (start of winter).
 
@@ -66,13 +64,13 @@ rises and drives the king out, and that reign is over.
 
 | Rank | What they do |
 |---|---|
-| **King** | Holds court in the castle (a pavilion until it's built). Has a temperament (Just, Pious, Greedy, Cruel, Brave, Gentle) that shapes the village. Ages and dies. The eldest son inherits, then a daughter, then kin. A child heir rules through a regent. With no heir, a claimant from another house takes the throne. An unwed king is found a match with a dowry. |
+| **King** | Holds court in the castle (a pavilion until it's built). Eats from the grain taxes and the mill's share, and buys grain at market when the granary runs short. Has a temperament (Just, Pious, Greedy, Cruel, Brave, Gentle) that shapes the village. Ages and dies. The eldest son inherits, then a daughter, then kin. A child heir rules through a regent. With no heir, a claimant from another house takes the throne. An unwed king is found a match with a dowry. |
 | **Knight** | Rides the village by day. Families are less likely to flee. |
 | **Bailiff** | The king's man. Lives in the Bailiff's Hall, keeps the tax chest and carries it to the castle. |
 | **Priest** | Says mass on Sundays and takes a tenth of every harvest as tithe. Gives alms from it to the hungry. |
-| **Reeve** | A serf chosen by the villagers each spring. Collects the taxes, and while he's in office the demesne yields 15% more. |
+| **Reeve** | A serf chosen by the villagers each spring. Collects the taxes, and while he's in office the strips are worked 10% better. |
 | **Freemen** | Work the trades (mill, woods, quarry, alehouse) for the crown's wage. Pay rent, and buy grain and firewood from the granary. |
-| **Serfs** | Owe the king week-work: 2 days a week by custom, on his demesne, his building sites, carting stone and timber, gathering his wood. The other days they work their own strips. Sunday is for mass. |
+| **Serfs** | Owe the king week-work: 2 days a week by custom, on his building sites, carting stone and timber, and gathering his wood. When there's nothing to do they go back to their own strips, which they work the rest of the week. Sunday is for mass. |
 
 **Loyalty** to the crown drifts toward what folk feel they deserve. It depends on whether they are fed, warm and housed,
 the taxes and dues, a reeve who doesn't squeeze them, how devout they are, an evening cup at the alehouse and the
@@ -81,6 +79,31 @@ king's temperament. Below 15, families slip away by night. If the village is loy
 **The year:** a 70-day year. Spring and summer grow the crop, autumn is the harvest, Michaelmas closes the tax accounts,
 Martinmas brings the tallage, Christmas the king's feast for the village (if the granary can bear it), and spring
 the new reeve.
+
+## Buildings
+
+| Building | Tab | Size | Timber / Stone | Labour (days) |
+|---|---|---|---|---|
+| Track | Tracks | 1×1 | free | instant |
+| Cottage | Homes | 2×3 | 10 / 0 | 6 |
+| Freeman's House | Homes | 2×3 | 16 / 4 | 9 |
+| Strip Field | Fields | 5×4 | 0 / 0 | 3 |
+| Woodward's Lodge | Works | 2×2 | 8 / 0 | 5 |
+| Quarry | Works | 2×2 | 6 / 0 | 5 |
+| Windmill | Works | 2×2 | 20 / 6 | 12 |
+| Alehouse | Works | 2×2 | 14 / 2 | 8 |
+| Parish Church | Church | 3×4 | 20 / 50 | 30 |
+| Castle | Crown | 7×6 | 40 / 120 | 60 |
+| Royal Granary | Crown | 3×2 | 24 / 6 | 10 |
+| Bailiff's Hall | Crown | 3×2 | 16 / 18 | 12 |
+| Castle Wall | Crown | 1×1 (drag to paint) | 0 / 3 | 1 per tile |
+| Wall Tower | Crown | 2×2 | 4 / 20 | 8 |
+| Gatehouse | Crown | 3×2 | 8 / 30 | 14 |
+
+Walls join up with each other, the towers and the gatehouse automatically. Nobody can walk through a wall, only through
+the gatehouse.
+
+![The castle with its walls](docs/castle.png)
 
 ![Buildings](docs/buildings.png)
 
