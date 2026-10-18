@@ -375,6 +375,9 @@ namespace MedievalTown.Simulation
                 case BuildingType.Manor:
                     RaiseBarony(b);
                     break;
+                case BuildingType.BoundaryStone:
+                    StoneSet(b);
+                    break;
                 case BuildingType.Church:
                     AddLog("The bishop consecrated " + ChurchName + ". There will be mass on Sundays.", LogKind.Church);
                     break;

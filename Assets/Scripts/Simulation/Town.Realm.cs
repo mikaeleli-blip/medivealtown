@@ -49,17 +49,49 @@ namespace MedievalTown.Simulation
         // =====================================================================
         // Founding villages, raising baronies
         // =====================================================================
-        /// <summary>The village whose cross is nearest a spot, within reach.</summary>
-        public Village VillageAt(int x, int y, int reach = Balance.VillageRadius)
+        struct Claim { public int X, Y, R, Village; }
+
+        /// <summary>The points a village's land is measured from: its cross, and every boundary stone it has set.</summary>
+        List<Claim> Claims(int extra)
         {
-            Village best = null; int bd = int.MaxValue;
-            foreach (var v in Villages)
+            var l = new List<Claim>();
+            var byId = new Dictionary<int, Village>();
+            foreach (var v in Villages) byId[v.Id] = v;
+            foreach (var b in Buildings)
             {
-                var c = CrossOf(v); if (c == null) continue;
-                int dx = c.X + 1 - x, dy = c.Y + 1 - y, d = dx * dx + dy * dy, r = v.Capital ? reach + 8 : reach;
-                if (d <= r * r && d < bd) { bd = d; best = v; }
+                Village v;
+                if (b.VillageId < 0 || !byId.TryGetValue(b.VillageId, out v)) continue;
+                if (b.Type == BuildingType.VillageCross && v.CrossId == b.Id)
+                    l.Add(new Claim { X = b.X + 1, Y = b.Y + 1, R = (v.Capital ? Balance.VillageRadius + 8 : Balance.VillageRadius) + extra, Village = v.Id });
+                else if (b.Type == BuildingType.BoundaryStone && b.Built)
+                    l.Add(new Claim { X = b.X, Y = b.Y, R = Balance.StoneReach + extra, Village = v.Id });
+            }
+            return l;
+        }
+
+        static int Nearest(List<Claim> claims, int x, int y)
+        {
+            int best = -1; float bd = float.MaxValue;
+            foreach (var c in claims)
+            {
+                int dx = c.X - x, dy = c.Y - y, d = dx * dx + dy * dy;
+                if (d > c.R * c.R) continue;
+                float rel = d;   // the nearest marker wins where two villages' lands meet
+                if (rel < bd) { bd = rel; best = c.Village; }
             }
             return best;
+        }
+
+        /// <summary>The village whose land a tile is on: the one with the nearest cross or boundary stone in reach.</summary>
+        public Village VillageAt(int x, int y, int extra = 0) { return GetVillage(Nearest(Claims(extra), x, y)); }
+
+        /// <summary>Which village every tile belongs to (-1: none), for the map.</summary>
+        public int[] LandMap()
+        {
+            var claims = Claims(0);
+            var m = new int[Cols * Rows];
+            for (int y = 0; y < Rows; y++) for (int x = 0; x < Cols; x++) m[y * Cols + x] = Nearest(claims, x, y);
+            return m;
         }
 
         /// <summary>A newly placed building belongs to the nearest village.</summary>
@@ -77,9 +109,12 @@ namespace MedievalTown.Simulation
             var d = Defs.Get(type);
             if (type == BuildingType.VillageCross)
             {
-                var near = VillageAt(x + 1, y + 1, Balance.VillageRadius + 6);
-                if (near != null) return "Too close to " + near.Name + ". A new village needs its own land";
+                var on = VillageAt(x + 1, y + 1);
+                if (on != null) return "That's " + on.Name + "'s land. A Boundary Stone extends it; a new cross needs land of its own";
+                var near = VillageAt(x + 1, y + 1, 6);
+                if (near != null) return "Too close to " + near.Name + ". A new village needs room for its own land";
             }
+            if (type == BuildingType.BoundaryStone && VillageAt(x, y) == null) return "A boundary stone has to stand on a village's land, to push its bounds further";
             if (type == BuildingType.Manor)
             {
                 var v = VillageAt(x + d.W / 2, y + d.H / 2);
@@ -126,6 +161,20 @@ namespace MedievalTown.Simulation
             return best;
         }
         public string BaronyName(Barony b) { var v = b != null ? GetVillage(b.SeatVillageId) : null; return v != null ? "the barony of " + v.Name : "a barony"; }
+
+        /// <summary>A boundary stone is set: the village's land grows, and anything already standing there with no village joins it.</summary>
+        void StoneSet(Building stone)
+        {
+            var v = VillageOf(stone); if (v == null) return;
+            int n = 0;
+            foreach (var b in Buildings)
+            {
+                if (b.VillageId >= 0 || b.Type == BuildingType.Road || b.Def.IsWall || b.Type == BuildingType.VillageCross) continue;
+                var d = b.Def;
+                if (VillageAt(b.X + d.W / 2, b.Y + d.H / 2) == v) { b.VillageId = v.Id; n++; }
+            }
+            AddLog("A boundary stone was set at the edge of " + v.Name + ". Its land reaches further now" + (n > 0 ? ", taking in " + n + (n == 1 ? " building" : " buildings") + " that belonged to no village." : "."), LogKind.Build);
+        }
 
         /// <summary>A manor is finished in a village: it becomes the seat of a barony, and a baron is sent for.</summary>
         void RaiseBarony(Building manor)

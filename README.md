@@ -45,6 +45,11 @@ The map is one big map. The capital (the village the king starts in) has its cro
   14 tiles of a cross belongs to its village (22 for the capital). Each village chooses its own reeve each spring, and
   newcomers settle in empty cottages anywhere. A house outside every village has no reeve: it pays no taxes, and an alert
   says so.
+- **Boundary Stones** (Realm tab, 2 stone) push a village's land further. Set one anywhere on a village's land and the
+  land 10 tiles around it joins that village; chain them to grow it in the direction you want. Where two villages' lands
+  meet, each tile goes to the nearest cross or stone. A new cross can't go on land a village already holds.
+- **Zones of control:** click a cross to see its village's land (a manor shows its whole barony), or press **Z** (or the
+  Zones button on the minimap) for the zone map: every village's land in its lord's colour, gold for the crown.
 - **Baronies.** Build a **Baron's Manor** in any village except the capital. When it's finished a baron comes to live
   there with his own tax collector, and the village becomes the seat of his barony. Villages you found within 45 tiles
   of a manor fall to that baron. You can move a village between the crown and a barony from its cross.
@@ -122,6 +127,7 @@ the new reeve.
 | Steward's Hall | Crown | 3×2 | 16 / 18 | 12 |
 | Village Cross | Realm | 2×2 | 2 / 6 | 3 |
 | Baron's Manor | Realm | 4×3 | 30 / 40 | 30 |
+| Boundary Stone | Realm | 1×1 | 0 / 2 | 1 |
 | Castle Wall | Crown | 1×1 (drag to paint) | 0 / 3 | 1 per tile |
 | Wall Tower | Crown | 2×2 | 4 / 20 | 8 |
 | Gatehouse | Crown | 3×2 | 8 / 30 | 14 |

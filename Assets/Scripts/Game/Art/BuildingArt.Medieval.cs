@@ -738,6 +738,23 @@ namespace MedievalTown.Game.Art
             k.M.PileAt = new Vector2Int(-1, -1);
         }
 
+        /// <summary>A boundary stone: a squat standing stone with a cross cut in it, on a little patch of trodden ground.</summary>
+        static void BoundaryStone(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.Ellipse(8, y0 + 12, 6, 3, PixelCanvas.C(W ? "#e4e0d8" : "#a08a5a"));
+            Shadow(tg, 4, y0 + 13, 9);
+            // the stone, rounded at the top
+            tg.R(5, y0 - 4, 6, 17, StoneWarm[0]); tg.R(6, y0 - 6, 4, 2, StoneWarm[0]);
+            tg.R(5, y0 - 4, 1, 17, StoneWarm[2]); tg.R(6, y0 - 6, 2, 1, StoneWarm[2]);
+            tg.R(10, y0 - 4, 1, 17, StoneWarm[3]); tg.R(9, y0 - 6, 1, 2, StoneWarm[3]);
+            // the cross cut into its face
+            tg.R(7, y0 - 2, 2, 8, StoneWarm[3]); tg.R(6, y0, 4, 2, StoneWarm[3]);
+            if (W) tg.R(6, y0 - 7, 4, 1, "#f4f8fa");
+            else { tg.D(5, y0 + 10, "#6a8a3a"); tg.D(10, y0 + 11, "#6a8a3a"); tg.D(6, y0 + 6, "#8a9a5a"); }
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
         /// <summary>A baron's manor: a stone hall under red tiles with a squat tower and his banner, and a timber wing for the household.</summary>
         static void Manor(Ctx k)
         {

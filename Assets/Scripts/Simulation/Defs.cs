@@ -6,7 +6,7 @@ namespace MedievalTown.Simulation
     /// <summary>Saves store these as numbers: only append.</summary>
     public enum BuildingType
     {
-        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, StewardHall, Wall, WallTower, Gatehouse, VillageCross, Manor
+        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, StewardHall, Wall, WallTower, Gatehouse, VillageCross, Manor, BoundaryStone
     }
     public enum Category { Roads, Homes, Fields, Works, Church, Crown, Realm, Hidden }
 
@@ -98,6 +98,7 @@ namespace MedievalTown.Simulation
 
         // ---- villages and baronies
         public const int VillageRadius = 14;       // tiles from a village cross that belong to its village
+        public const int StoneReach = 10;          // tiles a boundary stone adds to its village's land around it
         public const int BaronyReach = 45;         // a new village this close to a baron's manor falls under him
         public const float BaronStartLoyalty = 65f;
 
@@ -138,6 +139,7 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Cart, Category = Category.Hidden, Name = "Baggage Cart", Blurb = "Everything the household brought. It's unloaded into the granary once one stands.", W = 2, H = 2, IsStorage = true, Color = "#8a5a34" });
             Add(new BuildingDef { Type = BuildingType.StewardHall, Category = Category.Crown, Name = "Steward's Hall", Blurb = "Where the king's steward lives and keeps the crown's tax chest. His collector brings the taxes here every Monday; the steward takes them on to the castle on Tuesday.", W = 3, H = 2, Timber = 16, Stone = 18, Work = 12, Unique = true, IsHome = true, Beds = 4, Color = "#3e5a7a" });
             Add(new BuildingDef { Type = BuildingType.VillageCross, Category = Category.Realm, Name = "Village Cross", Blurb = "Founds a new village: a stone cross and a well on a green. Homes, strips and works within 14 tiles belong to it. Families come once there are cottages, and they choose their own reeve.", W = 2, H = 2, Timber = 2, Stone = 6, Work = 3, Color = "#d8c8a0" });
+            Add(new BuildingDef { Type = BuildingType.BoundaryStone, Category = Category.Realm, Name = "Boundary Stone", Blurb = "A carved stone that marks a village's bounds. Set one on a village's land and the land around it, 10 tiles each way, belongs to that village too. Chain them to push the bounds further.", W = 1, H = 1, Stone = 2, Work = 1, Color = "#bdb6aa" });
             Add(new BuildingDef { Type = BuildingType.Manor, Category = Category.Realm, Name = "Baron's Manor", Blurb = "Makes a village the seat of a barony. A baron comes to live here with his tax collector. Villages you found nearby will owe their taxes to him, and he to the crown.", W = 4, H = 3, Timber = 30, Stone = 40, Work = 30, IsHome = true, Beds = 6, Color = "#7a3a4a" });
             Add(new BuildingDef { Type = BuildingType.Wall, Category = Category.Crown, Name = "Castle Wall", Blurb = "A stone curtain wall with a walkway and battlements. Drag to lay a line of it; it joins up with towers and the gatehouse. Nobody can walk through it.", W = 1, H = 1, Stone = 3, Work = 1, IsWall = true, Color = "#6e6860" });
             Add(new BuildingDef { Type = BuildingType.WallTower, Category = Category.Crown, Name = "Wall Tower", Blurb = "A round stone tower to anchor the corners and long runs of the wall.", W = 2, H = 2, Timber = 4, Stone = 20, Work = 8, IsWall = true, Color = "#7a746a" });

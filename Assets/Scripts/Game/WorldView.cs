@@ -1121,16 +1121,11 @@ namespace MedievalTown.Game
         {
             var sb = new System.Text.StringBuilder();
             foreach (var v in town.Villages) { var c = town.CrossOf(v); sb.Append(v.Id).Append(':').Append(c != null ? c.X * 1000 + c.Y : -1).Append(v.Capital ? 'c' : '.').Append(';'); }
+            foreach (var b in town.Buildings) if (b.Type == BuildingType.BoundaryStone && b.Built) sb.Append('s').Append(b.Id).Append(':').Append(b.VillageId).Append(';');
             string k = sb.ToString();
             if (ZoneOwner != null && k == ownerKey) return;
             ownerKey = k;
-            if (ZoneOwner == null) ZoneOwner = new int[Town.Cols * Town.Rows];
-            for (int y = 0; y < Town.Rows; y++)
-                for (int x = 0; x < Town.Cols; x++)
-                {
-                    var v = town.VillageAt(x, y);
-                    ZoneOwner[y * Town.Cols + x] = v != null ? v.Id : -1;
-                }
+            ZoneOwner = town.LandMap();
         }
 
         void UpdateZones()

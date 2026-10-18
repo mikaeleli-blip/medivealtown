@@ -1048,6 +1048,7 @@ namespace MedievalTown.Game
                 {
                     s = d.Name + (d.Type == BuildingType.Road ? "" : " · " + Town.MaterialsText(d));
                     if (d.Type == BuildingType.VillageCross) { var lb = T.LiegeFor(a.x, a.y); s += "\nA new village, answering to " + (lb == null ? "the crown" : lb.BaronId >= 0 ? T.Title(T.GetCitizen(lb.BaronId)) : T.BaronyName(lb)); }
+                    else if (d.Type == BuildingType.BoundaryStone) { var v = T.VillageAt(a.x, a.y); s += "\nPushes " + (v != null ? v.Name : "the village") + "'s land " + Balance.StoneReach + " tiles further around it"; }
                     else if (d.Type != BuildingType.Road && !d.IsWall)
                     {
                         var v = T.VillageAt(a.x + d.W / 2, a.y + d.H / 2);
