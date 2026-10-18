@@ -39,6 +39,8 @@ namespace MedievalTown.Simulation
         public float OwedGrain, OwedCoin, Arrears;
         public float Coin, ChestGrain;    // a tax chest: village cross, baron's manor, steward's hall
         public int VillageId = -1;       // the village it belongs to
+        public float WeekSales, LastSales; // a shop's takings this week and last
+        public float Debt; public int DebtTo = -1;   // what a shop owes the supplier who let it have goods on credit
         public int Mask;                 // walls: which neighbours they join (1 north, 2 east, 4 south, 8 west; 16: the north one is a tower or gate)
 
         public BuildingDef Def { get { return Defs.Get(Type); } }
@@ -85,7 +87,9 @@ namespace MedievalTown.Simulation
         public int ArrivedDay;
         public int MassDay = -999;       // last Sunday at mass
         public int AleDay = -999;        // last cup at the alehouse
+        public int BreadDay = -999, MeatDay = -999, FishDay = -999;   // last ate bought bread, meat, fish
         public int Pregnant;             // days to go
+        public bool WasFree;             // a freeman serving as reeve, who goes back to being free when his year's done
         public float Honesty = 0.7f;     // 0..1: officers below about 0.6 take more than their due
         public string Name { get { return First + " " + Family; } }
         public bool IsChild { get { return Age < Balance.AdultAge; } }
@@ -99,7 +103,7 @@ namespace MedievalTown.Simulation
         public int WeekWork = 2;           // days a week each serf owes on the king's land
         public float HarvestTax = 0.3f;    // share of every strip's harvest owed in grain
         public float HearthTax = 0.1f;     // coin per household per week
-        public float Rent = 1f;            // coin per freeman household per week, on top of the hearth tax
+        public float Rent = 0.6f;          // coin per freeman household per week, on top of the hearth tax
         public float Tallage = 1f;         // coin per serf household, assessed at Martinmas (start of winter)
         public float ReeveCut = 0.05f;     // the reeve's share of what he collects
         public float BaronCut = 0.15f;     // a baron's share of what his collector brings in
@@ -112,6 +116,7 @@ namespace MedievalTown.Simulation
         public float Reserve = 200f;       // grain the granary keeps back beyond the household's needs until harvest
         public bool BuyMaterials = true;   // buy timber and stone from the merchant for waiting building sites
         public float CoinReserve = 40f;    // coin the treasury won't spend on materials
+        public float MarketToll = 0.1f;    // the crown's share of every sale a shop makes, collected by the reeve
     }
 
     /// <summary>Where the taxes went, stage by stage up the chain: households, reeves, barons, the steward, the king.</summary>
@@ -125,14 +130,15 @@ namespace MedievalTown.Simulation
         public float StewardCutCoin, StewardCutGrain;
         public float ReceivedCoin, ReceivedGrain;          // what reached the castle
         public float Withheld;                             // coin rebellious barons kept back
+        public float Tolls;                                // market tolls laid on the shops' sales (part of AssessedCoin)
         public float Unpaid;                               // coin households still owe
-        public void Clear() { AssessedCoin = AssessedGrain = ReeveCutCoin = ReeveCutGrain = CollectedCoin = CollectedGrain = BaronCutCoin = BaronCutGrain = StewardCutCoin = StewardCutGrain = ReceivedCoin = ReceivedGrain = Withheld = Unpaid = 0; }
+        public void Clear() { AssessedCoin = AssessedGrain = ReeveCutCoin = ReeveCutGrain = CollectedCoin = CollectedGrain = BaronCutCoin = BaronCutGrain = StewardCutCoin = StewardCutGrain = ReceivedCoin = ReceivedGrain = Withheld = Unpaid = Tolls = 0; }
         public void Add(TaxBook o)
         {
             AssessedCoin += o.AssessedCoin; AssessedGrain += o.AssessedGrain; ReeveCutCoin += o.ReeveCutCoin; ReeveCutGrain += o.ReeveCutGrain;
             CollectedCoin += o.CollectedCoin; CollectedGrain += o.CollectedGrain; BaronCutCoin += o.BaronCutCoin; BaronCutGrain += o.BaronCutGrain;
             StewardCutCoin += o.StewardCutCoin; StewardCutGrain += o.StewardCutGrain; ReceivedCoin += o.ReceivedCoin; ReceivedGrain += o.ReceivedGrain;
-            Withheld += o.Withheld; Unpaid += o.Unpaid;
+            Withheld += o.Withheld; Unpaid += o.Unpaid; Tolls += o.Tolls;
         }
     }
 

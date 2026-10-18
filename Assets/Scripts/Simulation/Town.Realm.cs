@@ -214,7 +214,7 @@ namespace MedievalTown.Simulation
         {
             var v = GetVillage(cross.VillageId);
             if (v == null || v.CrossId != cross.Id) return;
-            var reeve = GetCitizen(v.ReeveId); if (reeve != null) reeve.Rank = Rank.Serf;
+            var reeve = GetCitizen(v.ReeveId); if (reeve != null) StepDown(reeve);
             foreach (var b in Buildings) if (b.VillageId == v.Id) b.VillageId = -1;
             foreach (var bar in Baronies.Where(x => x.SeatVillageId == v.Id).ToList()) EndBarony(bar, "lost its seat");
             Villages.Remove(v);
@@ -299,16 +299,26 @@ namespace MedievalTown.Simulation
         void ChooseReeve(Village v, bool vacancy, int exclude = -1)
         {
             var old = GetCitizen(v.ReeveId);
-            if (old != null) old.Rank = Rank.Serf;
+            if (old != null) StepDown(old);
             v.ReeveId = -1;
             var folk = People.Where(p => !p.IsChild && p.Id != exclude && p.Health > 40 && p.Age >= 18 && p.Age < 62 && (p.Rank == Rank.Serf || p.Rank == Rank.Reeve) && VillageOf(p) == v).ToList();
+            // a village of freemen chooses one of them
+            if (folk.Count == 0) folk = People.Where(p => !p.IsChild && p.Id != exclude && p.Health > 40 && p.Age >= 18 && p.Age < 62 && p.Rank == Rank.Freeman && VillageOf(p) == v).ToList();
             if (folk.Count == 0) return;
             var pool = folk.Where(p => !p.Female && p.Age >= 20).ToList();
             if (pool.Count == 0) pool = folk;
             var pick = pool.OrderByDescending(p => p.Loyalty * 0.5f + Math.Min(p.Age, 50) * 0.4f + p.Piety * 0.15f + p.Honesty * 18 + p.Seed * 12 + (old != null && p.Id == old.Id && exclude < 0 ? 6 : 0)).First();
+            pick.WasFree = pick.Rank == Rank.Freeman || (pick.Rank == Rank.Reeve && pick.WasFree);
             pick.Rank = Rank.Reeve; v.ReeveId = pick.Id;
             if (old != null && old.Id == pick.Id) AddLog(v.Name + " kept " + pick.Name + " on as reeve for another year.", LogKind.Info);
             else AddLog("The villagers of " + v.Name + " chose " + pick.Name + " as reeve" + (vacancy ? " to fill the office." : " for the year.") + " He'll collect the village's taxes.", LogKind.Info);
+        }
+
+        /// <summary>A reeve's year is over: back to the strips, or to his trade if he was a freeman.</summary>
+        void StepDown(Citizen r)
+        {
+            if (r.Rank != Rank.Reeve) return;
+            r.Rank = r.WasFree ? Rank.Freeman : Rank.Serf; r.WasFree = false;
         }
 
         /// <summary>The crown tells a village to choose another reeve.</summary>
@@ -327,7 +337,7 @@ namespace MedievalTown.Simulation
             {
                 var r = GetCitizen(v.ReeveId);
                 if (spring) ChooseReeve(v, false);
-                else if (r == null || r.Rank != Rank.Reeve || VillageOf(r) != v) { if (r != null && r.Rank == Rank.Reeve) r.Rank = Rank.Serf; v.ReeveId = -1; if (HousesOf(v).Any()) ChooseReeve(v, true); }
+                else if (r == null || r.Rank != Rank.Reeve || VillageOf(r) != v) { if (r != null) StepDown(r); v.ReeveId = -1; if (HousesOf(v).Any()) ChooseReeve(v, true); }
             }
         }
         public Citizen ReeveOf(Village v) { return v != null ? GetCitizen(v.ReeveId) : null; }

@@ -738,6 +738,168 @@ namespace MedievalTown.Game.Art
             k.M.PileAt = new Vector2Int(-1, -1);
         }
 
+        // ================================================================== trades
+        static void Cow(PixelCanvas g, int x, int y, bool faceLeft, bool pig = false)
+        {
+            if (pig)
+            {
+                g.R(x, y, 7, 4, "#e8a8a0"); g.R(x, y + 3, 7, 1, "#c88880"); g.R(x + 1, y + 4, 1, 1, "#a87068"); g.R(x + 5, y + 4, 1, 1, "#a87068");
+                int hx = faceLeft ? x - 2 : x + 7; g.R(hx, y + 1, 2, 2, "#e8a8a0"); g.D(faceLeft ? hx : hx + 1, y + 2, "#c88880");
+                return;
+            }
+            g.R(x, y, 10, 5, "#8a5a3a"); g.R(x + 3, y, 3, 3, "#efe6d2"); g.R(x + 7, y + 2, 2, 2, "#efe6d2"); g.R(x, y + 4, 10, 1, "#6e4428");
+            foreach (int lx in new[] { 1, 3, 7, 9 }) g.R(x + lx - 1, y + 5, 1, 2, "#5a3a22");
+            int h = faceLeft ? x - 3 : x + 10;
+            g.R(h, y - 1, 3, 4, "#8a5a3a"); g.D(faceLeft ? h : h + 2, y + 2, "#e8c0a8"); g.D(faceLeft ? h + 2 : h, y - 2, "#e8dcc0");
+        }
+        static void Sheep(PixelCanvas g, int x, int y, bool faceLeft)
+        {
+            g.R(x, y, 7, 4, "#f4efe4"); g.R(x + 1, y - 1, 5, 1, "#f4efe4"); g.R(x, y + 3, 7, 1, "#d8d0c0");
+            g.D(x + 2, y, "#ffffff"); g.D(x + 4, y + 1, "#e0d8c8");
+            g.R(x + 1, y + 4, 1, 2, "#3a3030"); g.R(x + 5, y + 4, 1, 2, "#3a3030");
+            int hx = faceLeft ? x - 2 : x + 7; g.R(hx, y, 2, 3, "#3a3030"); g.D(faceLeft ? hx + 1 : hx, y - 1, "#3a3030");
+        }
+        static void Fence(PixelCanvas g, int x0, int y0, int x1, int y1, bool winter, int gapX = -1)
+        {
+            string post = "#7a4e2c", rail = "#a8784a";
+            for (int x = x0; x <= x1; x++)
+            {
+                bool gap = gapX >= 0 && x >= gapX && x < gapX + 6;
+                if (!gap) { g.D(x, y1 - 3, rail); g.D(x, y1 - 1, rail); }
+                g.D(x, y0 + 2, rail); g.D(x, y0 + 4, rail);
+                if ((x - x0) % 8 == 0 && !gap) { g.R(x, y1 - 5, 1, 6, post); g.R(x, y0, 1, 6, post); if (winter) { g.D(x, y1 - 6, SNOW); g.D(x, y0 - 1, SNOW); } }
+            }
+            for (int y = y0; y <= y1; y++) { g.D(x0, y, post); g.D(x1, y, post); if ((y - y0) % 3 == 1) { g.D(x0 + 1, y, rail); g.D(x1 - 1, y, rail); } }
+        }
+
+        /// <summary>A pasture: fenced grazing with a trough, a few cattle and a pig rooting by the gate.</summary>
+        static void Pasture(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            string grass = W ? "#e8e4dc" : k.Si == 2 ? "#a8a058" : "#7aae4a";
+            bg.R(1, y0 + 1, 62, 46, grass);
+            for (int i = 0; i < 90; i++) bg.D(2 + (int)(Hs(i, 71, 2) * 60), y0 + 2 + (int)(Hs(71, i, 5) * 44), W ? "#d8d2c6" : i % 3 == 0 ? "#5e8a3a" : "#94c060");
+            bg.Ellipse(14, y0 + 38, 9, 4, PixelCanvas.C(W ? "#d8d2c6" : "#8a7048"));   // trodden mud by the trough
+            Fence(tg, 0, y0 - 2, 63, y0 + 46, W, 26);
+            tg.R(8, y0 + 33, 12, 4, "#8a5a34"); tg.R(9, y0 + 33, 10, 1, W ? "#dfe8ee" : "#5a7a9a"); tg.R(8, y0 + 36, 12, 1, "#6e4428");
+            Cow(tg, 30, y0 + 10, true); Cow(tg, 46, y0 + 22, false); Cow(tg, 18, y0 + 18, false); Cow(tg, 38, y0 + 34, true, true);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A sheepfold: woven hurdles round a grazing, a shepherd's hut on wheels, and the flock.</summary>
+        static void Sheepfold(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            string grass = W ? "#e8e4dc" : k.Si == 2 ? "#a8a058" : "#86b456";
+            bg.R(1, y0 + 1, 62, 46, grass);
+            for (int i = 0; i < 80; i++) bg.D(2 + (int)(Hs(i, 81, 2) * 60), y0 + 2 + (int)(Hs(81, i, 5) * 44), W ? "#d8d2c6" : i % 3 == 0 ? "#6a9a42" : "#a0c870");
+            // hurdles: woven hazel panels
+            for (int x = 0; x < 64; x++)
+            {
+                bool gate = x >= 40 && x < 46;
+                for (int r = 0; r < 4; r++) { if (!gate) tg.D(x, y0 + 42 + r, (x + r) % 2 == 0 ? "#8a6a3a" : "#a8844e"); tg.D(x, y0 - 4 + r, (x + r) % 2 == 0 ? "#8a6a3a" : "#a8844e"); }
+            }
+            for (int y = y0 - 4; y < y0 + 46; y++) for (int c = 0; c < 2; c++) { tg.D(c, y, (y + c) % 2 == 0 ? "#8a6a3a" : "#a8844e"); tg.D(62 + c, y, (y + c) % 2 == 0 ? "#8a6a3a" : "#a8844e"); }
+            if (W) { tg.R(0, y0 - 5, 64, 1, SNOW); tg.R(0, y0 + 41, 40, 1, SNOW); tg.R(46, y0 + 41, 18, 1, SNOW); }
+            // the shepherd's hut on its wheels
+            tg.R(5, y0 + 4, 16, 10, "#6e5038"); for (int x = 6; x < 21; x += 3) tg.R(x, y0 + 4, 1, 10, "#54392a");
+            for (int r = 0; r < 4; r++) tg.R(4 + r / 2, y0 + r, 18 - r, 1, W ? SNOW : "#5a5e66");
+            tg.R(4, y0 + 3, 18, 1, "#43464d");
+            Door(k, 15, y0 + 6, 4, 8, "#5a3a22");
+            tg.Disc(8, y0 + 15, 2, "#3a2a1a"); tg.Disc(18, y0 + 15, 2, "#3a2a1a"); tg.D(8, y0 + 15, "#8a6a4a"); tg.D(18, y0 + 15, "#8a6a4a");
+            Sheep(tg, 30, y0 + 12, true); Sheep(tg, 42, y0 + 8, false); Sheep(tg, 50, y0 + 20, true); Sheep(tg, 26, y0 + 26, false); Sheep(tg, 38, y0 + 30, true); Sheep(tg, 14, y0 + 32, false);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A fishpond: a stew pond with reeds and a little jetty, the fisher's hut, and nets hung to dry.</summary>
+        static void Fishpond(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.Ellipse(32, y0 + 18, 15, 10, PixelCanvas.C(W ? "#c8d8e0" : "#a08a5a"));
+            bg.Ellipse(32, y0 + 18, 13, 8, PixelCanvas.C(W ? "#dfe8ee" : "#4a7aa0"));
+            bg.Ellipse(29, y0 + 16, 6, 3, PixelCanvas.C(W ? "#eef4f8" : "#6a9ac0"));
+            for (int i = 0; i < 6; i++) { int rx = 20 + i * 5, ry = y0 + 26 + (i % 2); tg.R(rx, ry - 4, 1, 4, W ? "#c8c0a8" : "#6a8a3a"); tg.D(rx, ry - 5, "#8a6a3a"); }
+            tg.R(36, y0 + 16, 10, 2, "#a8784a"); tg.R(37, y0 + 18, 1, 3, "#6e4428"); tg.R(44, y0 + 18, 1, 3, "#6e4428");   // the jetty
+            // the hut
+            Thatch(tg, 0, y0 - 6, 18, 12, W);
+            Daub(tg, 1, y0 + 6, 16, 14, Daubs[0]);
+            Door(k, 9, y0 + 11, 5, 9, "#5a3a22");
+            Foundation(tg, 1, y0 + 19, 16);
+            // nets drying on a pole frame
+            tg.R(2, y0 + 22, 1, 8, "#6e4428"); tg.R(14, y0 + 22, 1, 8, "#6e4428"); tg.R(2, y0 + 22, 13, 1, "#7a4e2c");
+            for (int x = 3; x < 14; x++) for (int y = y0 + 23; y < y0 + 28; y++) if ((x + y) % 2 == 0) tg.D(x, y, "#8a8a7a");
+            tg.R(16, y0 + 26, 4, 3, "#a8844e"); tg.D(17, y0 + 26, "#c0c8d0");   // a basket of the catch
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A bakehouse: a stone house with the great bread oven bulging out of its side and a loaf on the sign.</summary>
+        static void Bakehouse(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.R(0, y0 + 24, 32, 8, W ? "#d8d2c6" : "#b8996a");
+            Shadow(tg, 2, y0 + 27, 28);
+            Shingles(tg, 0, y0 - 10, 24, 14, Tiles, W);
+            Chimney(k, 17, y0 - 18, 9);
+            Stone(tg, 1, y0 + 4, 22, 23, StoneWarm);
+            // the oven dome on the right
+            for (int r = 0; r < 12; r++) { int hw = (int)Mathf.Round(Mathf.Sqrt(Mathf.Max(0, 36 - (r - 6) * (r - 6) * 0.9f))); tg.R(27 - hw, y0 + 14 + r, hw + 4, 1, r < 3 ? "#d0a070" : "#b8805a"); }
+            tg.R(23, y0 + 25, 8, 2, "#8a5a3a"); tg.R(25, y0 + 20, 4, 4, "#2a1a10"); tg.D(26, y0 + 21, "#e07a2a"); tg.D(27, y0 + 22, "#f0a040");
+            k.Glow.Add(new RectInt(25, y0 + 20, 4, 4));
+            Door(k, 9, y0 + 15, 6, 11, "#6e4428");
+            Window(k, 3, y0 + 9, 4, 4, false, TIMBERMID);
+            // the sign: a golden loaf
+            tg.R(14, y0 + 6, 1, 3, "#5a3a22"); tg.R(13, y0 + 9, 8, 5, "#6e4428"); tg.R(14, y0 + 10, 6, 3, "#d8a050"); tg.R(15, y0 + 10, 4, 1, "#f0c070");
+            // loaves cooling on the bench
+            tg.R(2, y0 + 26, 7, 1, "#a8784a"); tg.R(3, y0 + 27, 1, 2, "#7a4e2c"); tg.R(8, y0 + 27, 1, 2, "#7a4e2c");
+            tg.R(3, y0 + 24, 2, 2, "#c88a4a"); tg.R(6, y0 + 24, 2, 2, "#d8a050");
+            Foundation(tg, 1, y0 + 26, 22);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A butcher's shop: a timber shop front with the shutter let down as a counter under a striped awning, joints on hooks.</summary>
+        static void Butcher(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.R(0, y0 + 24, 32, 8, W ? "#d8d2c6" : "#b8996a");
+            Shadow(tg, 2, y0 + 27, 28);
+            Thatch(tg, 0, y0 - 12, 32, 14, W, ThatchOld);
+            Daub(tg, 2, y0 + 2, 28, 24, Daubs[1]);
+            Door(k, 22, y0 + 15, 6, 11, "#5a3a22");
+            // the awning, red and white
+            for (int x = 1; x < 20; x++) for (int r = 0; r < 3; r++) tg.D(x, y0 + 8 + r, ((x - 1) / 3) % 2 == 0 ? "#b5432f" : "#efe6d2");
+            for (int x = 2; x < 20; x += 3) tg.D(x, y0 + 11, "#b5432f");
+            // the open shop window with joints hanging, and the counter
+            tg.R(3, y0 + 12, 16, 8, "#3a2418");
+            foreach (int hx in new[] { 5, 9, 13, 16 }) { tg.D(hx, y0 + 12, "#9a9aa2"); tg.R(hx - 1, y0 + 13, 2, 3, hx % 2 == 0 ? "#c05a4a" : "#a8443a"); tg.D(hx - 1, y0 + 15, "#efe0d0"); }
+            tg.R(2, y0 + 20, 18, 2, "#a8784a"); tg.R(2, y0 + 22, 18, 1, "#7a4e2c");
+            tg.R(4, y0 + 19, 3, 1, "#c05a4a"); tg.R(12, y0 + 19, 4, 1, "#d88070");
+            tg.R(3, y0 + 23, 1, 3, "#6e4428"); tg.R(18, y0 + 23, 1, 3, "#6e4428");
+            Foundation(tg, 2, y0 + 26, 28);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A weaver's house: a wide window lit on the loom inside, and lengths of dyed cloth drying on a line.</summary>
+        static void Weaver(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.R(0, y0 + 24, 32, 8, W ? "#d8d2c6" : "#b8996a");
+            Shadow(tg, 2, y0 + 27, 28);
+            Thatch(tg, 0, y0 - 12, 32, 14, W);
+            Daub(tg, 2, y0 + 2, 28, 24, Daubs[2]);
+            Door(k, 4, y0 + 15, 6, 11, "#5a3a22");
+            // the loom window
+            tg.R(13, y0 + 7, 14, 9, TIMBERDARK); tg.R(14, y0 + 8, 12, 7, "#3a2a1a");
+            for (int x = 15; x < 25; x += 2) tg.R(x, y0 + 8, 1, 7, "#c8b088");
+            tg.R(14, y0 + 11, 12, 1, "#8a5a34"); tg.R(16, y0 + 12, 8, 2, "#6a5a8a");
+            k.Wins.Add(new RectInt(14, y0 + 8, 12, 7));
+            // cloth on the line
+            tg.R(12, y0 + 18, 1, 8, "#6e4428"); tg.R(30, y0 + 18, 1, 8, "#6e4428"); tg.R(12, y0 + 18, 19, 1, "#8a7a6a");
+            tg.R(14, y0 + 19, 4, 6, "#6a5a8a"); tg.R(19, y0 + 19, 4, 5, "#b5432f"); tg.R(24, y0 + 19, 5, 6, "#5a8a6a");
+            tg.R(14, y0 + 24, 4, 1, "#4a3a6a"); tg.R(24, y0 + 24, 5, 1, "#3a6a4a");
+            Foundation(tg, 2, y0 + 26, 28);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
         /// <summary>A boundary stone: a squat standing stone with a cross cut in it, on a little patch of trodden ground.</summary>
         static void BoundaryStone(Ctx k)
         {

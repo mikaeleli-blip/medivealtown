@@ -166,8 +166,17 @@ namespace MedievalTown.Simulation
             }
             foreach (var p in People) if (p.WorkId >= 0 && GetBuilding(p.WorkId) == null) p.WorkId = -1;
             var free = People.Where(p => !p.IsChild && p.Rank == Rank.Freeman && p.WorkId < 0 && p.Age < 62 && p.Health > 30).OrderBy(p => p.Female ? 1 : 0).ToList();
+            // the mill can't stand idle: if no freeman is free, one leaves a lesser trade for it
+            foreach (var mill in Buildings.Where(b => b.Built && b.Type == BuildingType.Mill && b.Employees.Count == 0))
+            {
+                if (free.Count > 0) break;
+                var shop = Buildings.Where(b => b.Built && b.Def.IsShop && b.Type != BuildingType.Bakehouse && b.Employees.Count > 0).OrderBy(b => b.LastSales).FirstOrDefault();
+                if (shop == null) break;
+                var p = GetCitizen(shop.Employees[0]); if (p == null || p.Rank != Rank.Freeman) break;
+                shop.Employees.Remove(p.Id); p.WorkId = -1; free.Add(p);
+            }
             // the mill first: the whole village needs it
-            foreach (var b in Buildings.Where(b => b.Built && b.Def.Workers > 0).OrderBy(b => b.Type == BuildingType.Mill ? 0 : b.Type == BuildingType.Woodcutter ? 1 : b.Type == BuildingType.Alehouse ? 2 : 3))
+            foreach (var b in Buildings.Where(b => b.Built && b.Def.Workers > 0).OrderBy(b => b.Type == BuildingType.Mill ? 0 : b.Type == BuildingType.Woodcutter ? 1 : b.Type == BuildingType.Bakehouse ? 2 : b.Def.IsShop ? 3 : 4).ThenBy(b => b.Id))
             {
                 while (b.Employees.Count < b.Def.Workers && free.Count > 0)
                 {
@@ -310,6 +319,7 @@ namespace MedievalTown.Simulation
             var home = rank == Rank.Freeman ? (freeHouse ?? empty[0]) : empty.OrderBy(b => Rng.Next()).First(b => b.Type == BuildingType.Cottage);
             var hv = VillageOf(home);
             // they bring enough to see them to their first harvest, roughly
+            home.Stock[(int)Good.Cloth] += 2 + n;
             home.Stock[(int)Good.Grain] += Math.Max(30, (2 + n * 0.6f) * Math.Min(DaysUntilHarvest, 50) * 0.6f / Balance.GrainFeeds);
             foreach (var p in People.Where(p => p.Family == fam && p.HomeId < 0 && p.ArrivedDay == Day)) { p.HomeId = home.Id; p.Loyalty = 60; }
             AddLog(rank == Rank.Freeman ? "A freeman, " + dad.Name + ", came with his family looking for work and took the empty house."

@@ -125,6 +125,12 @@ namespace MedievalTown.Simulation
         static float Clamp(float v, float a, float b) { return v < a ? a : v > b ? b : v; }
         public static string Money(float v) { return Math.Round(v, 1).ToString("0.#") + "c"; }
 
+        bool NearWater(int x, int y, int w, int h, int r)
+        {
+            for (int yy = y - r; yy < y + h + r; yy++) for (int xx = x - r; xx < x + w + r; xx++) if (TerrainAt(xx, yy) == Tile.Water) return true;
+            return false;
+        }
+
         public Building GetBuilding(int id) { if (id < 0) return null; for (int i = 0; i < Buildings.Count; i++) if (Buildings[i].Id == id) return Buildings[i]; return null; }
         public Citizen GetCitizen(int id) { if (id < 0) return null; for (int i = 0; i < People.Count; i++) if (People[i].Id == id) return People[i]; return null; }
         public IEnumerable<Building> OfType(BuildingType t) { return Buildings.Where(b => b.Type == t && b.Built); }
@@ -289,6 +295,7 @@ namespace MedievalTown.Simulation
             if (d.Unique && Buildings.Any(b => b.Type == type)) return "There's already a " + d.Name;
             var realm = RealmCheck(type, x, y); if (realm != null) return realm;
             if (d.NeedsStone && !NearStone(x, y, d.W, d.H, d.Radius)) return "A quarry needs a hillside next to it or boulders nearby";
+            if (d.NeedsWater && !NearWater(x, y, d.W, d.H, d.Radius)) return "A fishpond has to be next to a river or lake";
             return null;
         }
 
@@ -503,7 +510,7 @@ namespace MedievalTown.Simulation
                 int n = t.Rng.Next(0, 4);
                 for (int k = 0; k < n; k++) t.Child(mom, dad, t.Rnd(0.5f, 13));
                 if (i == 0) { var gran = t.AddPerson(true, fam, t.Rnd(52, 64), Rank.Serf); gran.MotherId = -1; }
-                home.Stock[(int)Good.Grain] = 130; home.Stock[(int)Good.Firewood] = 20;
+                home.Stock[(int)Good.Grain] = 130; home.Stock[(int)Good.Firewood] = 20; home.Stock[(int)Good.Cloth] = 4;
                 strip.HolderId = dad.Id;
                 foreach (var p in t.People.Where(p => p.Family == fam && p.HomeId < 0)) p.HomeId = home.Id;
             }
@@ -516,7 +523,7 @@ namespace MedievalTown.Simulation
                 Marry(dad, mom);
                 int n = t.Rng.Next(0, 3);
                 for (int k = 0; k < n; k++) t.Child(mom, dad, t.Rnd(0.5f, 12));
-                home.Stock[(int)Good.Grain] = 60; home.Stock[(int)Good.Firewood] = 15;
+                home.Stock[(int)Good.Grain] = 60; home.Stock[(int)Good.Firewood] = 15; home.Stock[(int)Good.Cloth] = 4;
                 foreach (var p in t.People.Where(p => p.Family == fam && p.HomeId < 0)) p.HomeId = home.Id;
             }
             // a couple of young serfs without a cottage of their own yet

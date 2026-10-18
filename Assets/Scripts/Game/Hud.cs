@@ -212,6 +212,12 @@ namespace MedievalTown.Game
             if (T.Sites.Any(s => s.MaterialsFraction < 1 && s.Progress >= s.MaterialsFraction * s.Def.Work - 0.5f) && T.StoreStock(Good.Timber) < 1 && T.StoreStock(Good.Stone) < 1)
                 lines.Add(new KeyValuePair<string, bool>("Building sites are waiting on timber and stone.", false));
             if (T.Priest == null) lines.Add(new KeyValuePair<string, bool>("The parish has no priest.", false));
+            if (si >= 2)
+            {
+                int rags = T.Buildings.Count(b => b.Built && b.Residents.Count > 0 && T.Ragged(b));
+                if (rags > 0) lines.Add(new KeyValuePair<string, bool>((rags == 1 ? "A family is" : rags + " families are") + " short of clothes for the cold. A Sheepfold and a Weaver's House make cloth.", false));
+            }
+            if (T.OfType(BuildingType.Bakehouse).Any() && T.WorkingMill == null) lines.Add(new KeyValuePair<string, bool>("The bakehouse needs a working windmill.", false));
             if (lines.Count == 0) return;
             float w = 0; foreach (var l in lines) w = Mathf.Max(w, PixelFont.Width(l.Key));
             w += 26;
@@ -253,7 +259,8 @@ namespace MedievalTown.Game
             var cats = Defs.PaletteOrder;
             float slotW = 30;
             var defs = Defs.InCategory(cat).ToList();
-            int nSlots = 2 + 6;
+            int most = Defs.PaletteOrder.Max(c => Defs.InCategory(c).Count());
+            int nSlots = 2 + Mathf.Max(6, most);
             float barW = nSlots * (slotW + 2) + 14;
             var bar = Block(new Rect(Mathf.Round((W - barW) / 2), H - 44, barW, 40));
             float tabW = 48, tabsW = cats.Length * (tabW + 2);
@@ -270,7 +277,7 @@ namespace MedievalTown.Game
             x += slotW + 2;
             if (Slot(new Rect(x, y, slotW, slotW), null, Icon.Axe, gc.Tool == ToolKind.Clear, "Clear land (X)\nFell trees (+2 timber), break boulders (+3 stone), pull stumps.")) gc.SetTool(ToolKind.Clear);
             x += slotW + 6;
-            foreach (var d in defs.Take(6))
+            foreach (var d in defs)
             {
                 var r = new Rect(x, y, slotW, slotW);
                 bool on = gc.Tool == ToolKind.Build && gc.BuildType == d.Type;
@@ -305,7 +312,7 @@ namespace MedievalTown.Game
             float w = 196;
             string blurb = d.Blurb ?? "";
             string extra = d.Workers > 0 ? "Up to " + d.Workers + (d.WorkerRank == Rank.Freeman ? " freemen" : " workers") + " · " + M(T.Policy.FreeWage) + " a day from the crown" : null;
-            if (d.Type == BuildingType.Alehouse) extra = "An alewife brews and keeps what she sells";
+            if (d.IsShop) extra = "Run by a freeman family for itself · " + Defs.GoodNames[(int)d.Sells.Value].ToLower() + " at " + M(d.Price) + " · " + Mathf.RoundToInt(T.Policy.MarketToll * 100) + "% toll";
             float h = 30 + Ui.WrappedHeight(blurb, w - 14) + (extra != null ? 11 : 0);
             var r = new Rect(Mathf.Clamp(anchor.x - 60, 4, W - w - 4), anchor.y - h, w, h);
             Ui.Tip(r);
@@ -665,6 +672,7 @@ namespace MedievalTown.Game
         {
             Heading("Taxes, " + title.ToLower());
             Row("Owed by households", M(t.AssessedCoin) + " · " + Mathf.FloorToInt(t.AssessedGrain) + " grain");
+            if (t.Tolls > 0.01f) Row("  of which market tolls", M(t.Tolls), Ui.InkSoft);
             Row("Reeve kept", M(t.ReeveCutCoin) + " · " + Mathf.FloorToInt(t.ReeveCutGrain) + " grain");
             Row("Reeves handed on", M(t.CollectedCoin) + " · " + Mathf.FloorToInt(t.CollectedGrain) + " grain");
             if (t.BaronCutCoin + t.BaronCutGrain > 0.01f) Row("Barons kept", M(t.BaronCutCoin) + " · " + Mathf.FloorToInt(t.BaronCutGrain) + " grain");
@@ -699,6 +707,8 @@ namespace MedievalTown.Game
                 "The crown's share of every family's harvest, in grain. It's what feeds the court. Above 30% the village feels it.");
             pol.HearthTax = SliderRow("Hearth tax", M(pol.HearthTax) + " a house a week", pol.HearthTax, 0, 1f, 0.05f,
                 "Coin from every household. Serfs have little coin; the reeve takes grain instead when they can't pay.");
+            pol.MarketToll = SliderRow("Market toll", Mathf.RoundToInt(pol.MarketToll * 100) + "% of every sale", pol.MarketToll, 0, 0.3f, 0.01f,
+                "The crown's share of everything the shops sell: bread, meat, fish, cloth, ale, beasts and wool. The reeve collects it from the shopkeepers on Friday with the other taxes. Above 10% the freemen feel it.");
             pol.Tallage = SliderRow("Tallage", M(pol.Tallage) + " a serf family", pol.Tallage, 0, 5, 0.5f,
                 "Laid on every serf family at Martinmas, the start of winter. Resented.");
             Heading("The officers' shares");
@@ -910,22 +920,23 @@ namespace MedievalTown.Game
                     Heading(b.Type == BuildingType.Keep || b.Type == BuildingType.Pavilion ? "The court" : "Living here");
                     foreach (var id in b.Residents) { var p = T.GetCitizen(id); if (p != null) FamilyLine(p, Defs.RankName(p)); }
                 }
+                if (d.IsShop) ShopPanel(b);
                 if (d.Workers > 0)
                 {
-                    Heading("Working here");
+                    Heading(d.IsShop ? "The family that runs it" : "Working here");
                     foreach (var id in b.Employees) { var p = T.GetCitizen(id); if (p != null) FamilyLine(p, p.Female ? "Freewoman" : "Freeman"); }
                     for (int i = b.Employees.Count; i < d.Workers; i++) Row("", "a place for a freeman", Ui.Warn);
                     if (b.Type == BuildingType.Woodcutter) Row("Trees in reach", T.TreesNear(b).ToString(), T.TreesNear(b) > 0 ? Ui.Ink : Ui.Bad);
                     if (b.Type == BuildingType.Quarry) Row("Stone", T.QuarryOnHill(b) ? "a hillside face" : T.RocksNear(b) + " boulders in reach");
                     if (b.Employees.Count > 0 && !T.TradeNeeded(b)) Para("Idle: the stores are full and nothing waits on it.");
                 }
-                if (b.Type == BuildingType.Granary || b.Type == BuildingType.Cart || Town.IsPeasantHome(b.Type) || b.Type == BuildingType.Church || b.Type == BuildingType.Alehouse || b.Type == BuildingType.StewardHall || b.Type == BuildingType.Manor)
+                if (b.Type == BuildingType.Granary || b.Type == BuildingType.Cart || Town.IsPeasantHome(b.Type) || b.Type == BuildingType.Church || d.IsShop || b.Type == BuildingType.StewardHall || b.Type == BuildingType.Manor)
                 {
                     bool any = false;
                     for (int g = 0; g < Balance.GoodCount; g++)
                     {
                         if (b.Stock[g] < 0.5f) continue;
-                        if (!any) { Heading(b.Type == BuildingType.Church ? "Tithe barn" : Town.IsPeasantHome(b.Type) ? "Pantry and woodpile" : "Stores"); any = true; }
+                        if (!any) { Heading(b.Type == BuildingType.Church ? "Tithe barn" : Town.IsPeasantHome(b.Type) ? "Pantry and woodpile" : d.IsShop ? "In the shop" : "Stores"); any = true; }
                         Row(Defs.GoodNames[g], Mathf.FloorToInt(b.Stock[g]).ToString());
                     }
                 }
@@ -946,6 +957,24 @@ namespace MedievalTown.Game
                     else confirmPullDown = b.Id;
                 }
                 by += 18;
+            }
+        }
+
+        void ShopPanel(Building b)
+        {
+            var d = b.Def;
+            Row("Sells", Defs.GoodNames[(int)d.Sells.Value] + " at " + M(d.Price) + (d.Sells == Good.Cloth ? " a length" : d.Sells == Good.Beasts ? " a beast" : ""));
+            if (d.Buys.HasValue) Row("Buys", Defs.GoodNames[(int)d.Buys.Value] + (d.Buys == Good.Grain ? " from serf families, at " + M(Balance.VillageGrain) : d.Buys == Good.Beasts ? " from the pastures" : " from the sheepfolds"));
+            Row("Takings last week", M(b.LastSales) + (b.WeekSales > 0.01f ? " (" + M(b.WeekSales) + " so far)" : ""));
+            if (b.Debt > 0.05f) Row("Owes its supplier", M(b.Debt), Ui.Warn);
+            if (b.Employees.Count == 0) Para("No freeman family has taken it up. Families come for the work when there's a house for them.", Ui.Warn);
+            else if (!T.TradeNeeded(b))
+            {
+                string why = b.Stock[(int)d.Sells.Value] >= d.Cap ? "Plenty on hand; waiting for buyers."
+                           : b.Type == BuildingType.Bakehouse && T.WorkingMill == null ? "Idle: there's no working windmill to grind the grain."
+                           : b.Type == BuildingType.Fishpond && T.WaterNear(b) == 0 ? "No water near enough to fish."
+                           : d.Buys.HasValue ? "Idle: no " + Defs.GoodNames[(int)d.Buys.Value].ToLower() + " to be had" + (d.Buys == Good.Beasts ? ". Build a Pasture." : d.Buys == Good.Wool ? ". Build a Sheepfold." : ".") : "Idle.";
+                Para(why, Ui.Warn);
             }
         }
 

@@ -87,6 +87,35 @@ Every officer has a hidden **honesty**:
 The shares, taxes and week-work are all set in **the Laws**. If loyalty stays near nothing for two weeks, the village
 rises and drives the king out, and that reign is over.
 
+## Trades and shops
+
+Freeman families run the trades for themselves: no crown wage, they keep what they sell for, and every sale owes the
+crown its **market toll** (10% by default, set in the Laws). The toll is laid on the shopkeeper's household and the
+reeve collects it on Friday with the other taxes, so it climbs the same chain as everything else.
+
+| Raw goods | Made from | Sells to |
+|---|---|---|
+| **Pasture** (herdsman): beasts | grazing | the butcher, 3.6c a beast |
+| **Sheepfold** (shepherd): wool | grazing | the weaver, 0.5c a fleece |
+| **Fishpond** (fisher, by water): fish | the river or lake | households, 0.35c |
+
+| Shop | Buys | Sells to households |
+|---|---|---|
+| **Bakehouse** | serfs' spare grain (0.22c), ground at the king's mill (multure applies) | bread, 0.4c |
+| **Butcher's Shop** | beasts from the pasture | meat, 0.6c |
+| **Weaver's House** | wool from the sheepfold, three fleeces a length | cloth, 3c |
+| **Alehouse** | grain | ale, 0.15c a cup |
+
+- **Serfs earn their coin** selling grain they can spare to the bakers and brewers, so they can pay the hearth tax and
+  tallage in coin instead of falling into arrears.
+- **Households shop** for what they can afford after what they owe the reeve. Freemen, who have no strips, live mostly
+  on bread; serfs buy it when they have coin to spare. Meat and fish now and then make folk happier (and meat feeds
+  more); a family short of **cloth** burns more firewood and resents the winter.
+- A shop that can't pay its supplier gets a little **credit** and pays it back from its takings.
+- The Trades tab on the hotbar has them all. A shop's panel shows its takings, what it's short of and why it's idle.
+
+![Trades](docs/trades.png)
+
 ## The hierarchy
 
 | Rank | What they do |
@@ -98,7 +127,7 @@ rises and drives the king out, and that reign is over.
 | **Collector** | Each baron has one, and so does the steward once there are other villages. Rides out to empty the chests. |
 | **Priest** | Says mass on Sundays and takes a tenth of every harvest as tithe. Gives alms from it to the hungry. |
 | **Reeve** | A serf chosen by each village every spring. Collects its taxes, and while he's in office its strips are worked 10% better. |
-| **Freemen** | Work the trades (mill, woods, quarry, alehouse) for the crown's wage. Pay rent, and buy grain and firewood from the granary. |
+| **Freemen** | Run the trades and shops for themselves, or work the crown's mill, woods and quarry for its wage. Pay rent (0.6c a week) and the market toll, and buy bread, grain and firewood. |
 | **Serfs** | Owe the king week-work: 2 days a week by custom, on his building sites, carting stone and timber, and gathering his wood. When there's nothing to do they go back to their own strips, which they work the rest of the week. Sunday is for mass. |
 
 **Loyalty** to the crown drifts toward what folk feel they deserve. It depends on whether they are fed, warm and housed,
@@ -120,7 +149,13 @@ the new reeve.
 | Woodward's Lodge | Works | 2×2 | 8 / 0 | 5 |
 | Quarry | Works | 2×2 | 6 / 0 | 5 |
 | Windmill | Works | 2×2 | 20 / 6 | 12 |
-| Alehouse | Works | 2×2 | 14 / 2 | 8 |
+| Pasture | Trades | 4×3 | 8 / 0 | 4 |
+| Sheepfold | Trades | 4×3 | 8 / 0 | 4 |
+| Fishpond | Trades | 3×2 | 8 / 0 | 4 |
+| Bakehouse | Trades | 2×2 | 10 / 8 | 8 |
+| Butcher's Shop | Trades | 2×2 | 12 / 2 | 7 |
+| Weaver's House | Trades | 2×2 | 12 / 0 | 7 |
+| Alehouse | Trades | 2×2 | 14 / 2 | 8 |
 | Parish Church | Church | 3×4 | 20 / 50 | 30 |
 | Castle | Crown | 7×6 | 40 / 120 | 60 |
 | Royal Granary | Crown | 3×2 | 24 / 6 | 10 |
@@ -148,7 +183,7 @@ the gatehouse.
 | Recenter | `H` |
 | Pause / speeds | `Space`, `1`–`4` (1×, 3×, 10×, 30×). A day lasts 3 minutes at 1×. |
 | Tools | `Q` inspect, `R` track, `X` clear trees and rocks, `Esc` or right-click to cancel |
-| Build | Hotbar at the bottom: Tracks, Homes, Fields, Works, Church, Crown, Realm. The placement tooltip says which village a building will belong to. |
+| Build | Hotbar at the bottom: Tracks, Homes, Fields, Works, Trades, Church, Crown, Realm. The placement tooltip says which village a building will belong to. |
 | Inspect | Click a villager or building. Click names in the books to find people on the map. |
 
 The four books at the top right:
@@ -157,7 +192,7 @@ The four books at the top right:
   (baron, loyalty, what he sent on, a strip-his-title button) with its villages, and the crown's own villages, each
   with its reeve and a new-reeve button. Click a village to go to its cross. Also the tax ledger (owed → reeves kept →
   barons kept → steward kept → reached the castle, plus anything rebels withheld), the church and the village.
-- **The Laws:** harvest tax, hearth tax, tallage, the reeves', barons' and steward's shares, week-work, multure, freemen's rent
+- **The Laws:** harvest tax, market toll, hearth tax, tallage, the reeves', barons' and steward's shares, week-work, multure, freemen's rent
   and wages, the grain price, the granary reserve, selling surplus, buying materials and the dole.
 - **Folk:** everyone, sortable by rank, loyalty, name or age.
 - **The Chronicle:** everything that's happened.
@@ -167,6 +202,7 @@ The four books at the top right:
 - `Assets/Scripts/Simulation`: engine-free and saved as JSON.
   - `Town.cs`: the map, placing and removing buildings, stores, a new manor.
   - `Town.Day.cs`: the daily plan and the day.
+  - `Town.Trade.cs`: the trades and shops, households' shopping, the market toll.
   - `Town.People.cs`: households, housing, strips, trades, births, deaths, marriages, flight, newcomers.
   - `Town.Realm.cs`: villages, baronies, reeves, the steward, the tax chain, Michaelmas accounts.
   - `Town.Court.cs`: succession, marriages, feast days, the priest, revolt.

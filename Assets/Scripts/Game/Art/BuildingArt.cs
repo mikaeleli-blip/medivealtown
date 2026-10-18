@@ -60,6 +60,11 @@ namespace MedievalTown.Game.Art
                 case BuildingType.VillageCross: return 16;
                 case BuildingType.Manor: return 28;
                 case BuildingType.BoundaryStone: return 8;
+                case BuildingType.Pasture: return 4;
+                case BuildingType.Sheepfold: return 6;
+                case BuildingType.Fishpond: return 8;
+                case BuildingType.Bakehouse: return 20;
+                case BuildingType.Butcher: case BuildingType.Weaver: return 14;
                 default: return 0;
             }
         }
@@ -254,6 +259,12 @@ namespace MedievalTown.Game.Art
                 case BuildingType.VillageCross: VillageCross(k); break;
                 case BuildingType.Manor: Manor(k); break;
                 case BuildingType.BoundaryStone: BoundaryStone(k); break;
+                case BuildingType.Pasture: Pasture(k); break;
+                case BuildingType.Sheepfold: Sheepfold(k); break;
+                case BuildingType.Fishpond: Fishpond(k); break;
+                case BuildingType.Bakehouse: Bakehouse(k); break;
+                case BuildingType.Butcher: Butcher(k); break;
+                case BuildingType.Weaver: Weaver(k); break;
             }
             k.Tg.Outline(OL);
             string n = type + "_" + v + "_" + si;

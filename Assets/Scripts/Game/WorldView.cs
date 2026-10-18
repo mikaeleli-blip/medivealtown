@@ -526,6 +526,24 @@ namespace MedievalTown.Game
             return new Vector2(b.X * 16 + 4 + a * (d.W * 16 - 8) * spread + (1 - spread) * (d.W * 8 - 4), (b.Y + d.H) * 16 + 3 + c * 4);
         }
 
+        /// <summary>A walkable tile beside water near a building, and which way to face it (x, y, direction); x is -1 if none.</summary>
+        Vector3Int NearestWater(Building b, int salt)
+        {
+            var d = b.Def; var found = new List<Vector3Int>();
+            for (int y = b.Y - 4; y < b.Y + d.H + 4; y++)
+                for (int x = b.X - 4; x < b.X + d.W + 4; x++)
+                {
+                    byte tt = town.TerrainAt(x, y);
+                    if ((tt != Tile.Grass && tt != Tile.Stump) || town.OccupantAt(x, y) != null) continue;
+                    if (town.TerrainAt(x + 1, y) == Tile.Water) found.Add(new Vector3Int(x, y, PeopleArt.Right));
+                    else if (town.TerrainAt(x - 1, y) == Tile.Water) found.Add(new Vector3Int(x, y, PeopleArt.Left));
+                    else if (town.TerrainAt(x, y + 1) == Tile.Water) found.Add(new Vector3Int(x, y, PeopleArt.Down));
+                    else if (town.TerrainAt(x, y - 1) == Tile.Water) found.Add(new Vector3Int(x, y, PeopleArt.Up));
+                }
+            if (found.Count == 0) return new Vector3Int(-1, -1, 0);
+            return found[Mathf.Abs(salt) % found.Count];
+        }
+
         bool HasDoor(Building b) { return b != null && b.Built && ArtFor(b).HasDoor; }
 
         Vector2 DoorStep(Building b, Citizen p)
@@ -618,6 +636,32 @@ namespace MedievalTown.Game
                             return j;
                         case BuildingType.Mill: case BuildingType.Alehouse:
                             j.Inside = true; return j;
+                        case BuildingType.Pasture: case BuildingType.Sheepfold:
+                        {
+                            // wandering among the beasts, a different spot every little while
+                            float w = t.Def.W * 16, h = t.Def.H * 16;
+                            int beat = Mathf.FloorToInt(time / 9f + p.Seed * 5);
+                            float fx = Mathf.Repeat(beat * 0.37f + p.Seed, 1f), fy = Mathf.Repeat(beat * 0.61f + p.Seed * 3, 1f);
+                            j.Spot = new Vector2(t.X * 16 + 8 + fx * (w - 16), t.Y * 16 + 12 + fy * (h - 16));
+                            j.Dir = beat % 2 == 0 ? PeopleArt.Left : PeopleArt.Right;
+                            j.Act = t.Type == BuildingType.Sheepfold && town.Season <= 1 ? PeopleArt.Act.Shears : PeopleArt.Act.Tend;
+                            return j;
+                        }
+                        case BuildingType.Fishpond:
+                        {
+                            // at the water's edge with a rod
+                            var wtile = NearestWater(t, p.Id);
+                            if (wtile.x >= 0) { j.Spot = new Vector2(wtile.x * 16 + 8, wtile.y * 16 + 8); j.Dir = wtile.z; j.Act = PeopleArt.Act.Fish; return j; }
+                            j.Inside = true; return j;
+                        }
+                        case BuildingType.Bakehouse: case BuildingType.Butcher: case BuildingType.Weaver:
+                        {
+                            // mornings at the trestle out front, the rest of the day inside
+                            if (ph > 0.55f) { j.Inside = true; return j; }
+                            j.Spot = new Vector2(t.X * 16 + 8 + t.Employees.IndexOf(p.Id) * 12, (t.Y + t.Def.H) * 16 + 4); j.Dir = PeopleArt.Down; j.Front = true;
+                            j.Act = t.Type == BuildingType.Bakehouse ? PeopleArt.Act.Knead : t.Type == BuildingType.Butcher ? PeopleArt.Act.Cleaver : PeopleArt.Act.Sew;
+                            return j;
+                        }
                     }
                     break;
                 case Chore.Mass: case Chore.Pray: case Chore.Court: case Chore.Accounts:

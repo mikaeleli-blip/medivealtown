@@ -6,9 +6,10 @@ namespace MedievalTown.Simulation
     /// <summary>Saves store these as numbers: only append.</summary>
     public enum BuildingType
     {
-        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, StewardHall, Wall, WallTower, Gatehouse, VillageCross, Manor, BoundaryStone
+        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, StewardHall, Wall, WallTower, Gatehouse, VillageCross, Manor, BoundaryStone,
+        Pasture, Sheepfold, Fishpond, Bakehouse, Butcher, Weaver
     }
-    public enum Category { Roads, Homes, Fields, Works, Church, Crown, Realm, Hidden }
+    public enum Category { Roads, Homes, Fields, Works, Trades, Church, Crown, Realm, Hidden }
 
     /// <summary>Where someone stands in the order of things, from the bottom up.</summary>
     public enum Rank { Serf, Freeman, Reeve, Collector, Steward, Priest, Knight, Baron, Noble, King }
@@ -22,7 +23,7 @@ namespace MedievalTown.Simulation
     public enum LogKind { Info, Good, Bad, Crown, Church, Build, Death, Birth }
 
     /// <summary>Saves keep one number per good in this order: only append.</summary>
-    public enum Good { Grain, Flour, Firewood, Timber, Stone, Ale }
+    public enum Good { Grain, Flour, Firewood, Timber, Stone, Ale, Bread, Meat, Fish, Wool, Cloth, Beasts }
 
     /// <summary>Terrain tile kinds. Values are stored in Town.Terrain.</summary>
     public static class Tile
@@ -40,7 +41,12 @@ namespace MedievalTown.Simulation
         public float Work;               // labour-days to finish
         public bool Unique, IsStorage, IsHome, IsField, IsWall;
         public int Workers, Beds, Radius;
-        public bool NeedsStone;
+        public bool NeedsStone, NeedsWater;
+        // a trade a freeman family runs for itself: it makes Sells (from Buys, if any) and keeps the takings, less the market toll
+        public bool IsShop;
+        public Good? Sells, Buys;
+        public float Price;              // what one unit of Sells fetches
+        public float Cap;                // stock it keeps on hand before it stops making more
         public Rank? WorkerRank;         // who takes the work: freemen trades, or anyone
         public string Color;             // palette swatch and minimap
         public bool Instant { get { return Work <= 0; } }
@@ -50,7 +56,7 @@ namespace MedievalTown.Simulation
     public static class Balance
     {
         public const int Cols = 224, Rows = 160;   // 16 px tiles
-        public const int GoodCount = 6;
+        public const int GoodCount = 12;
         public static readonly int[] SeasonDays = { 14, 21, 21, 14 };
         public const int DaysPerYear = 70, StartYear = 1240;
         public const float DaysPerYearF = 70f;
@@ -88,13 +94,26 @@ namespace MedievalTown.Simulation
         public const float SaplingGrowChance = 1f / 30f;
 
         // ---- money
-        public const float AlePrice = 0.08f;
+        public const float AlePrice = 0.15f;
         public const float MerchantGrain = 0.25f;   // what the travelling merchant pays for grain on market day
         public const float BuyTimber = 0.7f, BuyStone = 0.9f, BuyGrain = 0.4f;
         public const float FirewoodPrice = 0.05f;   // what freemen pay the lord for firewood   // and what he charges for building materials
         public const float FreemanStartCoin = 6f, SerfStartCoin = 1f;
         public const float StartCoin = 100f;
-        public static readonly float[] StartStock = { 420f, 0f, 60f, 70f, 30f, 0f };
+        public static readonly float[] StartStock = { 420f, 0f, 60f, 70f, 30f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
+
+        // ---- trades and shops (prices in coin; a day's food for one is about a third of a coin)
+        public const float VillageGrain = 0.22f;    // what bakers and brewers pay a serf family for its spare grain
+        public const float BreadFeeds = 1f, MeatFeeds = 1.3f, FishFeeds = 1f;
+        public const float BakePerWorker = 14f;     // loaves a baker makes in a day, a loaf from a measure of grain
+        public const float BeastsPerWorker = 0.18f; // beasts a herdsman raises in a day
+        public const float MeatPerBeast = 10f;
+        public const float WoolPerWorker = 0.9f;    // fleeces a shepherd brings in a day (half in winter)
+        public const float WoolPerCloth = 3f, ClothPerWorker = 0.5f;
+        public const float FishPerWorker = 4f;
+        public const float ClothWear = 1.4f;        // cloth a person wears out in a year
+        public const float BeastPrice = 3.6f, WoolPrice = 0.5f;
+        public const float CreditLimit = 4f;        // what a supplier lets a shop have on credit, paid back from its takings
 
         // ---- villages and baronies
         public const int VillageRadius = 14;       // tiles from a village cross that belong to its village
@@ -134,7 +153,15 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Woodcutter, Category = Category.Works, Name = "Woodward's Lodge", Blurb = "Freemen fell the king's trees for timber and split them for firewood.", W = 2, H = 2, Timber = 8, Work = 5, Workers = 3, Radius = 10, WorkerRank = Rank.Freeman, Color = "#7a4e2c" });
             Add(new BuildingDef { Type = BuildingType.Quarry, Category = Category.Works, Name = "Quarry", Blurb = "Freemen break stone from a hillside or boulders nearby.", W = 2, H = 2, Timber = 6, Work = 5, Workers = 3, Radius = 6, NeedsStone = true, WorkerRank = Rank.Freeman, Color = "#a39c90" });
             Add(new BuildingDef { Type = BuildingType.Mill, Category = Category.Works, Name = "Windmill", Blurb = "The king's mill. Everyone must grind their grain here and leave the miller's share for the crown. Bread feeds better than pottage.", W = 2, H = 2, Timber = 20, Stone = 6, Work = 12, Workers = 1, WorkerRank = Rank.Freeman, Color = "#f0ece0" });
-            Add(new BuildingDef { Type = BuildingType.Alehouse, Category = Category.Works, Name = "Alehouse", Blurb = "A freeman brews ale from grain and sells it of an evening. A cup now and then keeps folk content.", W = 2, H = 2, Timber = 14, Stone = 2, Work = 8, Workers = 2, WorkerRank = Rank.Freeman, Color = "#c49a3a" });
+            Add(new BuildingDef { Type = BuildingType.Alehouse, Category = Category.Trades, Name = "Alehouse", Blurb = "A freeman family brews ale from grain it buys and sells it of an evening. A cup now and then keeps folk content.", W = 2, H = 2, Timber = 14, Stone = 2, Work = 8, Workers = 2, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Ale, Buys = Good.Grain, Price = Balance.AlePrice, Cap = 60, Color = "#c49a3a" });
+            // raw goods: a freeman family raises or catches them and sells them on
+            Add(new BuildingDef { Type = BuildingType.Pasture, Category = Category.Trades, Name = "Pasture", Blurb = "A herdsman's family keeps cattle and pigs on fenced grazing and sells the fattened beasts to the butcher.", W = 4, H = 3, Timber = 8, Work = 4, Workers = 1, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Beasts, Price = Balance.BeastPrice, Cap = 6, Color = "#7a9a4a" });
+            Add(new BuildingDef { Type = BuildingType.Sheepfold, Category = Category.Trades, Name = "Sheepfold", Blurb = "A shepherd's family grazes a flock and sells the wool to the weaver.", W = 4, H = 3, Timber = 8, Work = 4, Workers = 1, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Wool, Price = Balance.WoolPrice, Cap = 30, Color = "#e8e2d0" });
+            Add(new BuildingDef { Type = BuildingType.Fishpond, Category = Category.Trades, Name = "Fishpond", Blurb = "A fisher's hut and stew pond by the water. The fisher sells fish to any household with a coin for it.", W = 3, H = 2, Timber = 8, Work = 4, Workers = 2, Radius = 3, NeedsWater = true, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Fish, Price = 0.35f, Cap = 40, Color = "#4a7a9a" });
+            // shops: they buy what they need and sell to the households
+            Add(new BuildingDef { Type = BuildingType.Bakehouse, Category = Category.Trades, Name = "Bakehouse", Blurb = "A baker buys serfs' spare grain, has it ground at the king's mill and sells bread. Needs a working windmill.", W = 2, H = 2, Timber = 10, Stone = 8, Work = 8, Workers = 2, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Bread, Buys = Good.Grain, Price = 0.4f, Cap = 50, Color = "#c88a4a" });
+            Add(new BuildingDef { Type = BuildingType.Butcher, Category = Category.Trades, Name = "Butcher's Shop", Blurb = "Buys fattened beasts from the pasture and sells meat. Folk who eat meat now and then are hardier and happier.", W = 2, H = 2, Timber = 12, Stone = 2, Work = 7, Workers = 1, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Meat, Buys = Good.Beasts, Price = 0.6f, Cap = 40, Color = "#a8443a" });
+            Add(new BuildingDef { Type = BuildingType.Weaver, Category = Category.Trades, Name = "Weaver's House", Blurb = "Buys wool from the sheepfold and weaves cloth. A family without decent clothes feels the cold of winter.", W = 2, H = 2, Timber = 12, Work = 7, Workers = 1, WorkerRank = Rank.Freeman, IsShop = true, Sells = Good.Cloth, Buys = Good.Wool, Price = 3f, Cap = 12, Color = "#6a5a8a" });
             Add(new BuildingDef { Type = BuildingType.Pavilion, Category = Category.Hidden, Name = "Royal Pavilion", Blurb = "A striped tent where the royal family lives until the castle is built.", W = 2, H = 2, Beds = 12, IsHome = true, Color = "#b5432f" });
             Add(new BuildingDef { Type = BuildingType.Cart, Category = Category.Hidden, Name = "Baggage Cart", Blurb = "Everything the household brought. It's unloaded into the granary once one stands.", W = 2, H = 2, IsStorage = true, Color = "#8a5a34" });
             Add(new BuildingDef { Type = BuildingType.StewardHall, Category = Category.Crown, Name = "Steward's Hall", Blurb = "Where the king's steward lives and keeps the crown's tax chest. His collector brings the taxes here every Monday; the steward takes them on to the castle on Tuesday.", W = 3, H = 2, Timber = 16, Stone = 18, Work = 12, Unique = true, IsHome = true, Beds = 4, Color = "#3e5a7a" });
@@ -146,13 +173,13 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Gatehouse, Category = Category.Crown, Name = "Gatehouse", Blurb = "Twin towers over an arched gate with a portcullis. The way through the walls.", W = 3, H = 2, Timber = 8, Stone = 30, Work = 14, IsWall = true, Color = "#8a847a" });
         }
 
-        public static readonly Category[] PaletteOrder = { Category.Roads, Category.Homes, Category.Fields, Category.Works, Category.Church, Category.Crown, Category.Realm };
-        public static readonly string[] CategoryNames = { "Tracks", "Homes", "Fields", "Works", "Church", "Crown", "Realm", "" };
+        public static readonly Category[] PaletteOrder = { Category.Roads, Category.Homes, Category.Fields, Category.Works, Category.Trades, Category.Church, Category.Crown, Category.Realm };
+        public static readonly string[] CategoryNames = { "Tracks", "Homes", "Fields", "Works", "Trades", "Church", "Crown", "Realm", "" };
         public static IEnumerable<BuildingDef> InCategory(Category c) { foreach (var d in all.Values) if (d.Category == c) yield return d; }
 
         public static readonly string[] Seasons = { "Spring", "Summer", "Autumn", "Winter" };
         public static readonly string[] Weekdays = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
-        public static readonly string[] GoodNames = { "Grain", "Flour", "Firewood", "Timber", "Stone", "Ale" };
+        public static readonly string[] GoodNames = { "Grain", "Flour", "Firewood", "Timber", "Stone", "Ale", "Bread", "Meat", "Fish", "Wool", "Cloth", "Beasts" };
 
         public static readonly string[] RankNames = { "Serf", "Freeman", "Reeve", "Collector", "Steward", "Priest", "Knight", "Baron", "Royal", "King" };
         public static string RankName(Citizen p)
