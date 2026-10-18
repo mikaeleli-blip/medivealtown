@@ -520,6 +520,7 @@ namespace MedievalTown.Simulation
             t.AddPerson(false, t.Pick(Defs.PeasantNames), t.Rnd(15, 22), Rank.Serf);
 
             t.Rehouse();
+            t.ReeveVacancies(true);
             t.AssignStrips();
             t.Hire();
             t.PlanDay();

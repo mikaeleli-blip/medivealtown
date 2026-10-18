@@ -252,7 +252,8 @@ namespace MedievalTown.Game.Art
         public static readonly Dictionary<Rank, string> RankColor = new Dictionary<Rank, string>
         {
             { Rank.Serf, "#a89a86" }, { Rank.Freeman, "#e8dcc0" }, { Rank.Reeve, "#5a9a4a" }, { Rank.Priest, "#2e2a33" },
-            { Rank.Knight, "#9a9ea6" }, { Rank.Noble, "#b05a82" }, { Rank.King, "#e0b04a" }
+            { Rank.Knight, "#9a9ea6" }, { Rank.Noble, "#b05a82" }, { Rank.King, "#e0b04a" },
+            { Rank.Steward, "#3e5a7a" }, { Rank.Collector, "#8a6a3a" }, { Rank.Baron, "#7a3a4a" }
         };
     }
 }
