@@ -542,6 +542,43 @@ namespace MedievalTown.Game.Art
             k.M.PileAt = new Vector2Int(-1, -1);
         }
 
+        /// <summary>The bailiff's hall: a stone ground floor where the tax chest is kept behind an iron-bound door, a timber-framed
+        /// upper floor where he lives, and the king's arms over the door.</summary>
+        static void BailiffHall(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.R(0, y0 + 26, 48, 6, W ? "#d8d2c6" : "#b8996a");
+            for (int y = y0 + 27; y < y0 + 32; y += 3) for (int x = 18; x < 30; x += 4) { bg.R(x + (y % 2) * 2, y, 3, 2, StoneC[0]); bg.D(x + (y % 2) * 2, y, StoneC[2]); }
+            Shadow(tg, 3, y0 + 29, 42);
+            Shingles(tg, 1, y0 - 18, 46, 14, Slate, W);
+            Chimney(k, 36, y0 - 24, 9);
+            // the timber upper floor, jettied over the stone
+            Daub(tg, 2, y0 - 4, 44, 13, Daubs[2], true, false);
+            for (int x = 6; x < 44; x += 5) tg.R(x, y0 - 3, 1, 11, TIMBERDARK);
+            tg.Line(3, y0 + 7, 9, y0 - 3, TIMBERMID); tg.Line(44, y0 + 7, 38, y0 - 3, TIMBERMID);
+            tg.R(2, y0 + 8, 44, 2, TIMBERDARK);
+            Window(k, 12, y0 - 1, 4, 4, false, TIMBERMID); Window(k, 32, y0 - 1, 4, 4, false, TIMBERMID);
+            // the stone lower floor with the counting-house door
+            Stone(tg, 4, y0 + 10, 40, 19, StoneC);
+            ArchDoor(k, 21, y0 + 16, 6, 12, "#4a3020", StoneC[2]);
+            tg.R(21, y0 + 20, 6, 1, "#3a3a3a"); tg.R(21, y0 + 24, 6, 1, "#3a3a3a");
+            // barred windows either side
+            foreach (int wx in new[] { 9, 35 })
+            {
+                tg.R(wx - 1, y0 + 15, 6, 6, StoneC[2]); tg.R(wx, y0 + 16, 4, 4, "#2a1a10");
+                tg.R(wx + 1, y0 + 16, 1, 4, "#5a5a62"); tg.R(wx + 3, y0 + 16, 1, 4, "#5a5a62");
+                k.Wins.Add(new RectInt(wx, y0 + 16, 4, 4));
+            }
+            // the king's arms over the door: a shield on a board
+            tg.R(20, y0 + 10, 8, 6, "#5a3a22");
+            tg.R(21, y0 + 10, 6, 4, "#b5432f"); tg.R(22, y0 + 14, 4, 1, "#b5432f"); tg.D(23, y0 + 15, "#b5432f"); tg.D(24, y0 + 15, "#b5432f");
+            tg.R(23, y0 + 10, 2, 4, "#e0b04a"); tg.R(21, y0 + 11, 6, 1, "#e0b04a");
+            Foundation(tg, 4, y0 + 28, 40);
+            // a bench where the reeve waits, and a tally stick rack
+            tg.R(31, y0 + 26, 8, 1, "#a8784a"); tg.R(32, y0 + 27, 1, 2, "#7a4e2c"); tg.R(38, y0 + 27, 1, 2, "#7a4e2c");
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
         /// <summary>The lord's pavilion: a big round tent in red and cream stripes with a pennant on top, where the household lives until the keep is built.</summary>
         static void Pavilion(Ctx k)
         {

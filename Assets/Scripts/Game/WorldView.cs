@@ -59,7 +59,7 @@ namespace MedievalTown.Game
             new Color32(232, 216, 144, 255), new Color32(106, 150, 62, 255)
         };
         sealed class Particle { public SpriteRenderer Sr; public float X, Y, Life, Max, Vx, Vy; public int Kind; }
-        struct Job { public PeopleArt.Act Act; public int Dir; public Vector2 Spot; public bool Front; public Building B; public bool Inside; public bool Hammer; }
+        struct Job { public PeopleArt.Act Act; public int Dir; public Vector2 Spot; public bool Front; public Building B; public bool Inside; public bool Hammer; public Sprite Carry; }
         sealed class Cloud { public SpriteRenderer Sr; public float X, Y; public int Rx; }
 
         readonly Dictionary<int, BuildingView> buildings = new Dictionary<int, BuildingView>();
@@ -95,7 +95,7 @@ namespace MedievalTown.Game
         {
             town = t; rig = cameraRig; nav = new Nav(t);
             PeopleArt.WorkplaceOf = p => { var w = town.GetBuilding(p.WorkId); return w != null ? w.Type : (BuildingType?)null; };
-            PeopleArt.Rules = p => p.Id == town.LordId || p.Id == town.RegentId;
+            PeopleArt.Rules = p => p.Id == town.KingId || p.Id == town.RegentId;
             foreach (Transform c in transform) Destroy(c.gameObject);
             buildings.Clear(); trees.Clear(); treeKinds.Clear(); people.Clear(); particles.Clear(); particlePool.Clear(); smokeTimers.Clear();
             sparkles.Clear(); clouds.Clear(); birds.Clear(); tents.Clear(); tentSpot.Clear();
@@ -230,7 +230,7 @@ namespace MedievalTown.Game
             switch (b.Type)
             {
                 case BuildingType.Cottage: case BuildingType.FreeHouse: return b.Residents.Count > 0;
-                case BuildingType.Keep: case BuildingType.Pavilion: return b.Residents.Count > 0;
+                case BuildingType.Keep: case BuildingType.Pavilion: case BuildingType.BailiffHall: return b.Residents.Count > 0;
                 case BuildingType.Church: return town.Priest != null && (t > 0.78f || town.IsSunday);
                 case BuildingType.Alehouse: return b.Employees.Count > 0 && !town.IsSunday && (t > 0.68f || t < 0.1f);
                 case BuildingType.Mill: return b.Employees.Count > 0 && t > 0.75f && t < 0.86f;
@@ -619,9 +619,28 @@ namespace MedievalTown.Game
                             j.Inside = true; return j;
                     }
                     break;
-                case Chore.Mass: case Chore.Pray: case Chore.Court:
+                case Chore.Mass: case Chore.Pray: case Chore.Court: case Chore.Accounts:
                     if (t != null) { j.Inside = true; return j; }
                     break;
+                case Chore.Collect:
+                {
+                    // door to door through the day, then on to the bailiff with the takings
+                    var houses = town.Buildings.Where(b => b.Built && Town.IsPeasantHome(b.Type) && b.Residents.Count > 0).OrderBy(b => b.X).ThenBy(b => b.Y).ToList();
+                    float k = Mathf.Clamp01((ph - 0.28f) / 0.38f);
+                    if (houses.Count == 0 || k >= 1f) { if (t != null) { j.Inside = true; j.B = t; } return j; }
+                    var h = houses[Mathf.Min(houses.Count - 1, Mathf.FloorToInt(k * houses.Count))];
+                    j.B = h; j.Spot = HasDoor(h) ? DoorStep(h, p) + new Vector2(4, 2) : Front(h, p); j.Dir = PeopleArt.Up;
+                    j.Carry = PropArt.CarriedSack();
+                    return j;
+                }
+                case Chore.Deliver:
+                {
+                    // the morning at the hall, the chest carried to the castle at midday, then back to the books
+                    var seat = town.Seat;
+                    if (ph < 0.42f || ph > 0.6f || seat == null) { if (t != null) { j.Inside = true; j.B = t; } return j; }
+                    j.Inside = true; j.B = seat; j.Carry = PropArt.Chest();
+                    return j;
+                }
             }
             j.Spot = new Vector2(float.NaN, 0);
             return j;
@@ -703,7 +722,8 @@ namespace MedievalTown.Game
                     else
                     {
                         job = JobFor(p, task, ph);
-                        if (job.Inside && task != null) { visit = task; inside = true; goal = HasDoor(task) ? DoorStep(task, p) : Front(task, p); }
+                        var target = job.B ?? task;
+                        if (job.Inside && target != null) { visit = target; inside = true; goal = HasDoor(target) ? DoorStep(target, p) : Front(target, p); }
                         else if (!float.IsNaN(job.Spot.x)) goal = job.Spot;
                         else goal = home != null ? Front(home, p) : CampCenter();
                     }
@@ -822,6 +842,11 @@ namespace MedievalTown.Game
                         v.LastPhase = phase;
                         if (job.Front && job.B != null) order = Mathf.Max(order, SortOrder((job.B.Y + job.B.Def.H) * 16, 3));
                     }
+                }
+                if (job.Carry != null && v.DoorState == Out && !v.Held.enabled)
+                {
+                    v.Held.enabled = true; v.Held.sprite = job.Carry;
+                    v.Held.transform.localPosition = Pixels.ToWorld(-4, -13);
                 }
                 v.Sr.sprite = act != PeopleArt.Act.None ? PeopleArt.Working(p, v.Dir, act, phase) : PeopleArt.Get(p, v.Dir, frame);
                 v.Sr.color = tint; v.Held.color = tint;

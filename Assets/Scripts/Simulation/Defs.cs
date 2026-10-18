@@ -6,17 +6,17 @@ namespace MedievalTown.Simulation
     /// <summary>Saves store these as numbers: only append.</summary>
     public enum BuildingType
     {
-        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart
+        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, BailiffHall
     }
-    public enum Category { Roads, Homes, Fields, Works, Church, Hidden }
+    public enum Category { Roads, Homes, Fields, Works, Church, Crown, Hidden }
 
     /// <summary>Where someone stands in the order of things, from the bottom up.</summary>
-    public enum Rank { Serf, Freeman, Reeve, Priest, Knight, Noble, Lord }
+    public enum Rank { Serf, Freeman, Reeve, Bailiff, Priest, Knight, Noble, King }
 
     /// <summary>What someone is doing today.</summary>
-    public enum Chore { None, OwnStrip, WeekWork, Build, Gather, Trade, Mass, Pray, Court, Patrol, Play, Rest, Flee }
+    public enum Chore { None, OwnStrip, WeekWork, Build, Gather, Trade, Mass, Pray, Court, Patrol, Play, Rest, Flee, Collect, Deliver, Accounts }
 
-    /// <summary>A lord's (or anyone's) temperament. Lords' traits shape the whole manor.</summary>
+    /// <summary>A temperament. The king's shapes the whole realm.</summary>
     public enum Trait { Just, Pious, Greedy, Cruel, Brave, Gentle }
 
     public enum LogKind { Info, Good, Bad, Crown, Church, Build, Death, Birth }
@@ -96,9 +96,10 @@ namespace MedievalTown.Simulation
         public const float StartCoin = 100f;
         public static readonly float[] StartStock = { 420f, 0f, 60f, 70f, 30f, 0f };
 
-        // ---- the crown
-        public const float TributeBase = 20f, TributePerAdult = 2f;
-        public const float StartFavour = 60f;
+        // ---- the officers
+        public const float SkimMax = 0.35f;        // the most a thoroughly crooked officer takes on top of his cut
+        public const int BailiffArrives = 6;       // days for a new bailiff to come after one's dismissed
+        public const int RevoltDays = 14;          // days of near-zero loyalty before the village rises
 
         // ---- people
         public const float LoyaltyStart = 55f;
@@ -119,35 +120,37 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Road, Category = Category.Roads, Name = "Track", Blurb = "A beaten earth track. People walk faster on it.", W = 1, H = 1, Color = "#c4a878" });
             Add(new BuildingDef { Type = BuildingType.Cottage, Category = Category.Homes, Name = "Cottage", Blurb = "Wattle, daub and thatch on a cruck frame, with a toft garden behind. Houses one serf family.", W = 2, H = 3, Timber = 10, Work = 6, IsHome = true, Beds = Balance.HouseholdMax, Color = "#c8a050" });
             Add(new BuildingDef { Type = BuildingType.FreeHouse, Category = Category.Homes, Name = "Freeman's House", Blurb = "A timber-framed house on a stone sill. Freemen pay rent in coin instead of labour.", W = 2, H = 3, Timber = 16, Stone = 4, Work = 9, IsHome = true, Beds = Balance.HouseholdMax, Color = "#e8dcc4" });
-            Add(new BuildingDef { Type = BuildingType.Keep, Category = Category.Homes, Name = "Keep", Blurb = "The lord's stone keep and great hall. Court is held here. Until it stands the lord's family lives in a pavilion.", W = 4, H = 4, Timber = 30, Stone = 80, Work = 40, Unique = true, IsHome = true, Beds = 12, Color = "#8d877d" });
+            Add(new BuildingDef { Type = BuildingType.Keep, Category = Category.Crown, Name = "Castle", Blurb = "The king's stone keep and great hall. Court is held here, and the taxes end up in its treasury. Until it stands the royal family lives in a pavilion.", W = 4, H = 4, Timber = 30, Stone = 80, Work = 40, Unique = true, IsHome = true, Beds = 12, Color = "#8d877d" });
             Add(new BuildingDef { Type = BuildingType.Church, Category = Category.Church, Name = "Parish Church", Blurb = "Stone nave and bell tower. The priest says mass on Sundays and takes a tenth of every harvest.", W = 3, H = 4, Timber = 20, Stone = 50, Work = 30, Unique = true, Beds = 1, Color = "#e8e2d4" });
-            Add(new BuildingDef { Type = BuildingType.Granary, Category = Category.Works, Name = "Granary", Blurb = "The lord's barn and stores: grain, flour, firewood, timber and stone.", W = 3, H = 2, Timber = 24, Stone = 6, Work = 10, IsStorage = true, Color = "#b5432f" });
-            Add(new BuildingDef { Type = BuildingType.Strip, Category = Category.Fields, Name = "Strip Field", Blurb = "A serf family's strips in the open field. They work it on the days they don't owe the lord.", W = 3, H = 3, Work = 2, IsField = true, Color = "#a08452" });
-            Add(new BuildingDef { Type = BuildingType.Demesne, Category = Category.Fields, Name = "Demesne Field", Blurb = "The lord's own field, worked by serfs on their week-work days. Its harvest fills the granary.", W = 4, H = 4, Work = 3, IsField = true, Color = "#d8b060" });
-            Add(new BuildingDef { Type = BuildingType.Woodcutter, Category = Category.Works, Name = "Woodward's Lodge", Blurb = "Freemen fell the lord's trees for timber and split them for firewood.", W = 2, H = 2, Timber = 8, Work = 5, Workers = 3, Radius = 10, WorkerRank = Rank.Freeman, Color = "#7a4e2c" });
+            Add(new BuildingDef { Type = BuildingType.Granary, Category = Category.Crown, Name = "Royal Granary", Blurb = "The king's barn and stores: grain, flour, firewood, timber and stone. The grain taxes end up here.", W = 3, H = 2, Timber = 24, Stone = 6, Work = 10, IsStorage = true, Color = "#b5432f" });
+            Add(new BuildingDef { Type = BuildingType.Strip, Category = Category.Fields, Name = "Strip Field", Blurb = "A serf family's strips in the open field. They work it on the days they don't owe the king, and give part of the harvest in tax.", W = 3, H = 3, Work = 2, IsField = true, Color = "#a08452" });
+            Add(new BuildingDef { Type = BuildingType.Demesne, Category = Category.Fields, Name = "Royal Demesne", Blurb = "The king's own field, worked by serfs on their week-work days. Its harvest fills the royal granary.", W = 4, H = 4, Work = 3, IsField = true, Color = "#d8b060" });
+            Add(new BuildingDef { Type = BuildingType.Woodcutter, Category = Category.Works, Name = "Woodward's Lodge", Blurb = "Freemen fell the king's trees for timber and split them for firewood.", W = 2, H = 2, Timber = 8, Work = 5, Workers = 3, Radius = 10, WorkerRank = Rank.Freeman, Color = "#7a4e2c" });
             Add(new BuildingDef { Type = BuildingType.Quarry, Category = Category.Works, Name = "Quarry", Blurb = "Freemen break stone from a hillside or boulders nearby.", W = 2, H = 2, Timber = 6, Work = 5, Workers = 3, Radius = 6, NeedsStone = true, WorkerRank = Rank.Freeman, Color = "#a39c90" });
-            Add(new BuildingDef { Type = BuildingType.Mill, Category = Category.Works, Name = "Windmill", Blurb = "The lord's mill. Serfs must grind their grain here and leave the miller's share for the lord. Bread feeds better than pottage.", W = 2, H = 2, Timber = 20, Stone = 6, Work = 12, Workers = 1, WorkerRank = Rank.Freeman, Color = "#f0ece0" });
+            Add(new BuildingDef { Type = BuildingType.Mill, Category = Category.Works, Name = "Windmill", Blurb = "The king's mill. Everyone must grind their grain here and leave the miller's share for the crown. Bread feeds better than pottage.", W = 2, H = 2, Timber = 20, Stone = 6, Work = 12, Workers = 1, WorkerRank = Rank.Freeman, Color = "#f0ece0" });
             Add(new BuildingDef { Type = BuildingType.Alehouse, Category = Category.Works, Name = "Alehouse", Blurb = "A freeman brews ale from grain and sells it of an evening. A cup now and then keeps folk content.", W = 2, H = 2, Timber = 14, Stone = 2, Work = 8, Workers = 2, WorkerRank = Rank.Freeman, Color = "#c49a3a" });
-            Add(new BuildingDef { Type = BuildingType.Pavilion, Category = Category.Hidden, Name = "Lord's Pavilion", Blurb = "A striped tent where the lord's family lives until the keep is built.", W = 2, H = 2, Beds = 12, IsHome = true, Color = "#b5432f" });
+            Add(new BuildingDef { Type = BuildingType.Pavilion, Category = Category.Hidden, Name = "Royal Pavilion", Blurb = "A striped tent where the royal family lives until the castle is built.", W = 2, H = 2, Beds = 12, IsHome = true, Color = "#b5432f" });
             Add(new BuildingDef { Type = BuildingType.Cart, Category = Category.Hidden, Name = "Baggage Cart", Blurb = "Everything the household brought. It's unloaded into the granary once one stands.", W = 2, H = 2, IsStorage = true, Color = "#8a5a34" });
+            Add(new BuildingDef { Type = BuildingType.BailiffHall, Category = Category.Crown, Name = "Bailiff's Hall", Blurb = "Where the king's bailiff lives and keeps the tax chest. The reeve brings the village's taxes here every Friday; the bailiff takes them on to the castle on Saturday.", W = 3, H = 2, Timber = 16, Stone = 18, Work = 12, Unique = true, IsHome = true, Beds = 4, Color = "#3e5a7a" });
         }
 
-        public static readonly Category[] PaletteOrder = { Category.Roads, Category.Homes, Category.Fields, Category.Works, Category.Church };
-        public static readonly string[] CategoryNames = { "Tracks", "Homes", "Fields", "Works", "Church", "" };
+        public static readonly Category[] PaletteOrder = { Category.Roads, Category.Homes, Category.Fields, Category.Works, Category.Church, Category.Crown };
+        public static readonly string[] CategoryNames = { "Tracks", "Homes", "Fields", "Works", "Church", "Crown", "" };
         public static IEnumerable<BuildingDef> InCategory(Category c) { foreach (var d in all.Values) if (d.Category == c) yield return d; }
 
         public static readonly string[] Seasons = { "Spring", "Summer", "Autumn", "Winter" };
         public static readonly string[] Weekdays = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
         public static readonly string[] GoodNames = { "Grain", "Flour", "Firewood", "Timber", "Stone", "Ale" };
 
-        public static readonly string[] RankNames = { "Serf", "Freeman", "Reeve", "Priest", "Knight", "Noble", "Lord" };
+        public static readonly string[] RankNames = { "Serf", "Freeman", "Reeve", "Bailiff", "Priest", "Knight", "Royal", "King" };
         public static string RankName(Citizen p)
         {
-            if (p.IsChild) return p.Rank >= Rank.Noble ? (p.Female ? "Young lady" : "Young lord") : "Child";
+            if (p.IsChild) return p.Rank >= Rank.Noble ? (p.Female ? "Princess" : "Prince") : "Child";
             switch (p.Rank)
             {
-                case Rank.Lord: return p.Female ? "Lady of the manor" : "Lord of the manor";
-                case Rank.Noble: return p.Female ? "Lady" : "Noble";
+                case Rank.King: return p.Female ? "Queen regnant" : "King";
+                case Rank.Noble: return p.Female ? (p.PartnerId >= 0 ? "Queen" : "Princess") : (p.PartnerId >= 0 ? "Prince consort" : "Prince");
+                case Rank.Bailiff: return "The king's bailiff";
                 case Rank.Knight: return "Knight";
                 case Rank.Priest: return "Priest";
                 case Rank.Reeve: return "Reeve";
@@ -159,11 +162,11 @@ namespace MedievalTown.Simulation
         public static readonly string[] TraitNames = { "Just", "Pious", "Greedy", "Cruel", "Brave", "Gentle" };
         public static readonly string[] TraitBlurbs =
         {
-            "Holds fair courts. Folk trust the manor more.",
+            "Holds fair courts. Folk trust the crown more.",
             "Gives to the church and keeps the feast days. Folk are a little more devout.",
             "Counts every coin. Takes a bigger cut of the mill and market.",
-            "Rules by fear. Folk resent the manor, but fewer dare to flee.",
-            "Wins the king's respect. Royal favour falls more slowly.",
+            "Rules by fear. Folk resent the crown, but fewer dare to flee.",
+            "Leads his knights himself. Families think twice about fleeing.",
             "Soft-hearted. Feeds the hungry from the granary."
         };
 

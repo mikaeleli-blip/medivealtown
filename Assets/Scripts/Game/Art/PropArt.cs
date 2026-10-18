@@ -231,6 +231,20 @@ namespace MedievalTown.Game.Art
             }, new Vector2(0, 1));
         }
 
+        /// <summary>The tax chest: iron-bound oak with a lock, carried in both arms. Pivot top-left.</summary>
+        public static Sprite Chest()
+        {
+            return Cached("carry_chest", () =>
+            {
+                var g = new PixelCanvas(10, 8);
+                g.R(1, 2, 8, 5, "#7a4a2a"); g.R(1, 1, 8, 2, "#9a6a3a"); g.R(1, 1, 8, 1, "#b8844a");
+                g.R(1, 3, 8, 1, "#5a5a62"); g.R(3, 1, 1, 6, "#5a5a62"); g.R(6, 1, 1, 6, "#5a5a62");
+                g.D(4, 4, "#e0b04a"); g.D(5, 4, "#e0b04a");
+                g.Outline(OL);
+                return g;
+            }, new Vector2(0, 1));
+        }
+
         public static Sprite CarriedStone()
         {
             return Cached("carry_stone", () =>

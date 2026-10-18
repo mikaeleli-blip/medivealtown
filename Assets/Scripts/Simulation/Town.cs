@@ -5,18 +5,18 @@ using System.Linq;
 namespace MedievalTown.Simulation
 {
     /// <summary>
-    /// The whole manor: map, buildings, people, the lord's stores and books, the church and the crown.
+    /// The whole village: map, buildings, people, the crown's stores and treasury, the tax chain, the church.
     /// Engine-free so it can be tested headless and saved as plain JSON. The Unity layer reads it and calls Advance / Place / Remove.
     /// </summary>
     [Serializable]
     public partial class Town
     {
-        public const int CurrentVersion = 1;
+        public const int CurrentVersion = 2;
         public int Version = CurrentVersion;
         public int Seed;
         public int Day = 1;
         public float TimeOfDay = 0.3f;           // 0 = midnight, 0.5 = noon
-        public float Coin;                       // the lord's treasury
+        public float Coin;                       // the royal treasury
         public ManorPolicy Policy = new ManorPolicy();
         public int NextId = 1;
         public string ManorName, Dynasty, ChurchName;
@@ -27,8 +27,10 @@ namespace MedievalTown.Simulation
         public List<LogEntry> Log = new List<LogEntry>();
         public List<HistoryPoint> History = new List<HistoryPoint>();
 
-        public int LordId = -1, RegentId = -1, ReeveId = -1, PriestId = -1;
-        public int Generation = 1;               // lords of this house so far
+        public int KingId = -1, RegentId = -1, ReeveId = -1, PriestId = -1, BailiffId = -1;
+        public int Generation = 1;               // monarchs of this house so far
+        public TaxBook Taxes = new TaxBook(), LastTaxes = new TaxBook();   // this year's and last year's
+        public float WeekTaxCoin, WeekTaxGrain, LastTaxCoin, LastTaxGrain;   // taxes received this week and last
         public Crown Crown = new Crown();
         public int Births, Deaths, Fled, Arrived;
 
@@ -125,31 +127,30 @@ namespace MedievalTown.Simulation
         public Building Keep { get { return OfType(BuildingType.Keep).FirstOrDefault(); } }
         public Building Church { get { return OfType(BuildingType.Church).FirstOrDefault(); } }
         public Building Pavilion { get { return OfType(BuildingType.Pavilion).FirstOrDefault(); } }
-        public Building Seat { get { return Keep ?? Pavilion; } }    // where the lord holds court
-        public Citizen Lord { get { return GetCitizen(LordId); } }
+        public Building Seat { get { return Keep ?? Pavilion; } }    // where the king holds court
+        public Citizen King { get { return GetCitizen(KingId); } }
         public Citizen Regent { get { return GetCitizen(RegentId); } }
         public Citizen Reeve { get { return GetCitizen(ReeveId); } }
         public Citizen Priest { get { return GetCitizen(PriestId); } }
-        /// <summary>Whoever actually rules: the lord, or the regent while he's a child.</summary>
-        public Citizen Ruler { get { var l = Lord; if (l != null && l.IsChild && Regent != null) return Regent; return l; } }
+        /// <summary>Whoever actually rules: the king, or the regent while he's a child.</summary>
+        public Citizen Ruler { get { var l = King; if (l != null && l.IsChild && Regent != null) return Regent; return l; } }
         public bool RulerIs(Trait t) { var r = Ruler; return r != null && r.Trait == t; }
         public bool MassToday { get { return IsSunday && Church != null && Priest != null; } }
 
         public static bool IsHome(BuildingType t) { return Defs.Get(t).IsHome; }
         public static bool IsPeasantHome(BuildingType t) { return t == BuildingType.Cottage || t == BuildingType.FreeHouse; }
-        public static bool HouseholdOfLord(Citizen p) { return p.Rank == Rank.Lord || p.Rank == Rank.Noble || p.Rank == Rank.Knight; }
+        public static bool RoyalHousehold(Citizen p) { return p.Rank == Rank.King || p.Rank == Rank.Noble || p.Rank == Rank.Knight; }
 
-        /// <summary>The average loyalty of grown folk outside the lord's household.</summary>
+        /// <summary>The average loyalty of grown folk outside the royal household.</summary>
         public float AverageLoyalty
         {
             get
             {
-                var l = People.Where(p => !p.IsChild && !HouseholdOfLord(p)).ToList();
+                var l = People.Where(p => !p.IsChild && !RoyalHousehold(p) && p.Rank != Rank.Priest && p.Rank != Rank.Bailiff).ToList();
                 return l.Count == 0 ? 50f : l.Average(p => p.Loyalty);
             }
         }
         public float AveragePiety { get { var l = Adults.ToList(); return l.Count == 0 ? 0f : l.Average(p => p.Piety); } }
-        public float TributeDue { get { return (float)Math.Round(Balance.TributeBase + Balance.TributePerAdult * Adults.Count()); } }
 
         // =====================================================================
         // Stores: the granary (or the baggage cart until one stands)
@@ -280,7 +281,7 @@ namespace MedievalTown.Simulation
                     if (t == Tile.Hill) return "Too steep. Nothing can be built on the hills";
                     if (t == Tile.Water && type != BuildingType.Road) return "Only a track can ford the water";
                 }
-            if (d.Unique && Buildings.Any(b => b.Type == type)) return "The manor already has a " + d.Name;
+            if (d.Unique && Buildings.Any(b => b.Type == type)) return "There's already a " + d.Name;
             if (d.NeedsStone && !NearStone(x, y, d.W, d.H, d.Radius)) return "A quarry needs a hillside next to it or boulders nearby";
             return null;
         }
@@ -341,8 +342,8 @@ namespace MedievalTown.Simulation
                         Buildings.Remove(pav); MarkDirty(pav);
                     }
                     var r = Ruler;
-                    AddLog((r != null ? r.Name : "The lord") + " moved the household into the keep. Court is held in the great hall now.", LogKind.Crown);
-                    Crown.Favour = Clamp(Crown.Favour + 5, 0, 100);
+                    AddLog((r != null ? Title(r) : "The king") + " moved the court into the castle. The treasury is kept in the great hall now.", LogKind.Crown);
+                    foreach (var p in People) if (!RoyalHousehold(p)) p.Loyalty = Clamp(p.Loyalty + 3, 0, 100);
                     break;
                 case BuildingType.Church:
                     AddLog("The bishop consecrated " + ChurchName + ". There will be mass on Sundays.", LogKind.Church);
@@ -412,8 +413,6 @@ namespace MedievalTown.Simulation
             t.ManorName = t.Pick(new[] { "Ashby", "Thornbury", "Oakhurst", "Wexley", "Hollowmere", "Elmstead", "Brackenford", "Coldharbour", "Wyndham", "Fernley" });
             t.Dynasty = t.Pick(Defs.NobleHouses);
             t.ChurchName = t.Pick(Defs.Saints) + "'s";
-            t.Crown.King = "King " + t.Pick(Defs.Kings) + t.Pick(new[] { "", " II", " III" });
-            t.Crown.TributeYear = Balance.StartYear - 1;
 
             // clear the old village ground
             for (int y = TrailRow - 9; y <= TrailRow + 6; y++)
@@ -428,24 +427,27 @@ namespace MedievalTown.Simulation
                 t.Place(BuildingType.Road, x, TrailRow, out err, true);
             }
 
-            // the lord's household arrives with a pavilion and a cart
+            // the royal household arrives with a pavilion and a cart
             var pav = t.Place(BuildingType.Pavilion, VillageX + 8, TrailRow - 8, out err, true);
             var cart = t.Place(BuildingType.Cart, VillageX + 11, TrailRow - 8, out err, true);
             for (int g = 0; g < Balance.GoodCount; g++) cart.Stock[g] = Balance.StartStock[g];
             for (int y = TrailRow - 6; y < TrailRow; y++) t.Place(BuildingType.Road, VillageX + 11, y, out err, true);
 
-            var lord = t.AddPerson(false, t.Dynasty, t.Rnd(26, 36), Rank.Lord);
+            var lord = t.AddPerson(false, t.Dynasty, t.Rnd(26, 36), Rank.King);
+            lord.First = t.Pick(Defs.Kings);
             var lady = t.AddPerson(true, t.Dynasty, t.Rnd(20, 30), Rank.Noble);
             Marry(lord, lady);
             lord.Trait = (Trait)t.Rng.Next(6); lady.Trait = (Trait)t.Rng.Next(6);
-            t.LordId = lord.Id;
+            t.KingId = lord.Id;
             int kids = t.Rng.Next(1, 3);
             for (int k = 0; k < kids; k++) t.Child(lady, lord, t.Rnd(1, 8));
             var knight = t.AddPerson(false, t.Pick(Defs.KnightNames), t.Rnd(24, 40), Rank.Knight);
             knight.Loyalty = 75;
             var priest = t.AddPerson(false, t.Pick(Defs.PeasantNames), t.Rnd(30, 50), Rank.Priest);
             priest.Piety = 90; t.PriestId = priest.Id;
-            foreach (var p in new[] { lord, lady, knight, priest }) p.HomeId = pav.Id;
+            var bailiff = t.AddPerson(false, t.Pick(Defs.KnightNames), t.Rnd(30, 48), Rank.Bailiff);
+            bailiff.Honesty = (float)Math.Round(t.Rnd(0.3f, 1f), 2); bailiff.Loyalty = 70; bailiff.Coin = 5; t.BailiffId = bailiff.Id;
+            foreach (var p in new[] { lord, lady, knight, priest, bailiff }) p.HomeId = pav.Id;
 
             // the village: six serf families with their cottages and strips, and two freemen
             for (int i = 0; i < 6; i++)
@@ -484,10 +486,10 @@ namespace MedievalTown.Simulation
             t.PlanDay();
             t.DirtyTiles.Clear();
             t.Log.Clear();
-            t.AddLog(t.Crown.King + " has granted the manor of " + t.ManorName + " to " + lord.Name + ", lord of the house of " + t.Dynasty + ".", LogKind.Crown);
+            t.AddLog(t.Title(lord) + " of the house of " + t.Dynasty + " has come to " + t.ManorName + " to make it the seat of his kingdom.", LogKind.Crown);
             t.AddLog("The village has six serf families, two freemen and an old track. There is no keep, no church and no mill.", LogKind.Info);
-            t.AddLog("The king expects tribute every Michaelmas, at the end of autumn: about " + Money(t.TributeDue) + " this year.", LogKind.Crown);
-            t.AddLog("Serfs owe the lord " + t.Policy.WeekWork + " days' work a week. Stake out a Demesne Field and a Granary first, then the Keep and the Church.", LogKind.Info);
+            t.AddLog("Taxes climb the chain: every Friday the reeve collects from each household and carries it to " + t.Title(bailiff) + ", the king's bailiff, who brings it to the king on Saturday. Each keeps a share.", LogKind.Crown);
+            t.AddLog("Serfs owe the king " + t.Policy.WeekWork + " days' work a week. Stake out a Royal Demesne and a Granary first, then the Bailiff's Hall, the Castle and the Church.", LogKind.Info);
             return t;
         }
 
@@ -501,7 +503,7 @@ namespace MedievalTown.Simulation
                 First = Pick(female ? Defs.WomenNames : Defs.MenNames), Seed = (float)Rng.NextDouble(), ArrivedDay = Day,
                 Trait = (Trait)Rng.Next(6),
                 Coin = rank == Rank.Freeman ? Balance.FreemanStartCoin : rank == Rank.Serf ? Balance.SerfStartCoin : 0,
-                Loyalty = Balance.LoyaltyStart + Rnd(-8, 8), Piety = Rnd(25, 60)
+                Loyalty = Balance.LoyaltyStart + Rnd(-8, 8), Piety = Rnd(25, 60), Honesty = (float)Math.Round(Rnd(0.15f, 1f), 2)
             };
             People.Add(p);
             return p;
@@ -509,7 +511,7 @@ namespace MedievalTown.Simulation
 
         Citizen Child(Citizen mother, Citizen father, float age)
         {
-            var c = AddPerson(Chance(0.5), father != null ? father.Family : mother.Family, age, mother.Rank == Rank.Lord ? Rank.Noble : father != null && father.IsNoble ? Rank.Noble : mother.Rank == Rank.Noble ? Rank.Noble : father != null && father.Rank == Rank.Freeman ? Rank.Freeman : mother.Rank == Rank.Freeman ? Rank.Freeman : Rank.Serf);
+            var c = AddPerson(Chance(0.5), father != null ? father.Family : mother.Family, age, mother.Rank == Rank.King ? Rank.Noble : father != null && father.IsNoble ? Rank.Noble : mother.Rank == Rank.Noble ? Rank.Noble : father != null && father.Rank == Rank.Freeman ? Rank.Freeman : mother.Rank == Rank.Freeman ? Rank.Freeman : Rank.Serf);
             c.MotherId = mother.Id; c.FatherId = father != null ? father.Id : -1;
             c.HomeId = mother.HomeId;
             c.Coin = 0;

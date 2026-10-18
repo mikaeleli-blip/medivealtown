@@ -15,18 +15,18 @@ namespace MedievalTown.Simulation
         {
             for (int guard = 0; guard < 6 && p != null; guard++)
             {
-                if (HouseholdOfLord(p)) return LordHouseholdKey;
-                if (p.Rank == Rank.Priest) return p.Id;
+                if (RoyalHousehold(p)) return RoyalKey;
+                if (p.Rank == Rank.Priest || p.Rank == Rank.Bailiff) return p.Id;
                 var partner = GetCitizen(p.PartnerId);
                 if (partner != null) return p.Female ? partner.Id : p.Id;
                 // unmarried: with a parent if there is one in the village
                 var parent = GetCitizen(p.MotherId) ?? GetCitizen(p.FatherId);
-                if (parent != null && !HouseholdOfLord(parent) && parent.Rank != Rank.Priest && (p.IsChild || p.Age < 24)) { p = parent; continue; }
+                if (parent != null && !RoyalHousehold(parent) && parent.Rank != Rank.Priest && parent.Rank != Rank.Bailiff && (p.IsChild || p.Age < 24)) { p = parent; continue; }
                 return p.Id;
             }
             return p != null ? p.Id : -1;
         }
-        public const int LordHouseholdKey = -2;
+        public const int RoyalKey = -2;
 
         public Citizen HeadOf(Building home)
         {
@@ -54,7 +54,7 @@ namespace MedievalTown.Simulation
             var seat = Seat;
             // the lord's household
             List<Citizen> court;
-            if (units.TryGetValue(LordHouseholdKey, out court))
+            if (units.TryGetValue(RoyalKey, out court))
             {
                 foreach (var p in court) p.HomeId = seat != null ? seat.Id : -1;
                 if (seat != null) taken.Add(seat.Id);
@@ -63,9 +63,13 @@ namespace MedievalTown.Simulation
             var church = Church;
             foreach (var p in People.Where(p => p.Rank == Rank.Priest)) p.HomeId = church != null ? church.Id : seat != null ? seat.Id : -1;
             if (church != null) taken.Add(church.Id);
+            // the bailiff lives at his hall, or with the court until it's built
+            var hall = BailiffHall;
+            foreach (var p in People.Where(p => p.Rank == Rank.Bailiff)) p.HomeId = hall != null ? hall.Id : seat != null ? seat.Id : -1;
+            if (hall != null) taken.Add(hall.Id);
 
             // families keep their house if it suits them; the head's house wins when two families claim one
-            var families = units.Where(kv => kv.Key != LordHouseholdKey && !kv.Value.Any(p => p.Rank == Rank.Priest)).ToList();
+            var families = units.Where(kv => kv.Key != RoyalKey && !kv.Value.Any(p => p.Rank == Rank.Priest || p.Rank == Rank.Bailiff)).ToList();
             var homeless = new List<KeyValuePair<int, List<Citizen>>>();
             foreach (var kv in families.OrderByDescending(kv => kv.Value.Count(p => !p.IsChild && p.PartnerId >= 0)).ThenByDescending(kv => kv.Value.Count))
             {
@@ -218,7 +222,7 @@ namespace MedievalTown.Simulation
                 float merchet = m.Rank == Rank.Freeman ? 0f : Math.Min(0.5f, m.Coin + w.Coin);
                 float fromM = Math.Min(m.Coin, merchet); m.Coin -= fromM; w.Coin -= merchet - fromM;
                 Coin += merchet; WeekIn += merchet;
-                AddLog(m.Name + " and " + w.First + " were married" + (Church != null ? " at the church door" : "") + (merchet > 0 ? ". The lord took " + Money(merchet) + " merchet." : "."), LogKind.Good);
+                AddLog(m.Name + " and " + w.First + " were married" + (Church != null ? " at the church door" : "") + (merchet > 0 ? ". The crown took " + Money(merchet) + " merchet." : "."), LogKind.Good);
             }
             Rehouse();
         }
@@ -227,7 +231,7 @@ namespace MedievalTown.Simulation
         {
             if (!People.Contains(p)) return;
             Deaths++;
-            bool notable = HouseholdOf(p) == LordHouseholdKey || p.Rank == Rank.Priest || p.Rank == Rank.Reeve || p.Age > 1;
+            bool notable = HouseholdOf(p) == RoyalKey || p.Rank == Rank.Priest || p.Rank == Rank.Reeve || p.Age > 1;
             if (notable) AddLog(Title(p) + " died " + how + (p.Age >= 1 ? ", aged " + (int)p.Age : "") + ".", LogKind.Death);
             var partner = GetCitizen(p.PartnerId); if (partner != null) partner.PartnerId = -1;
             foreach (var c in People) { if (c.MotherId == p.Id) c.MotherId = -1; if (c.FatherId == p.Id) c.FatherId = -1; }
@@ -237,10 +241,11 @@ namespace MedievalTown.Simulation
             if (p.Rank == Rank.Serf && !p.IsChild && home != null && home.Stock[(int)Good.Grain] > 20) { float h = Math.Min(10, home.Stock[(int)Good.Grain] * 0.1f); home.Stock[(int)Good.Grain] -= h; PutInStores(Good.Grain, h); }
             var work = GetBuilding(p.WorkId); if (work != null) work.Employees.Remove(p.Id);
             People.Remove(p);
-            if (p.Id == LordId) Succession(p);
+            if (p.Id == KingId) Succession(p);
             if (p.Id == RegentId) RegentId = -1;
             if (p.Id == ReeveId) { ReeveId = -1; ChooseReeve(true); }
             if (p.Id == PriestId) PriestDied();
+            if (p.Id == BailiffId) { BailiffId = -1; Crown.BailiffDay = Day + Balance.BailiffArrives; AddLog("A new bailiff has been sent for.", LogKind.Crown); }
             Rehouse(); AssignStrips(); Hire();
         }
 
@@ -248,14 +253,13 @@ namespace MedievalTown.Simulation
         void Flee(int head, List<Citizen> family)
         {
             var h = GetCitizen(head) ?? family[0];
-            AddLog("The " + h.Family + " family fled the manor in the night" + (family.Any(p => p.Rank == Rank.Serf) ? " rather than stay bound to it." : "."), LogKind.Bad);
+            AddLog("The " + h.Family + " family fled in the night" + (family.Any(p => p.Rank == Rank.Serf) ? " rather than stay bound to it." : "."), LogKind.Bad);
             foreach (var p in family)
             {
                 if (p.Id == ReeveId) ReeveId = -1;
                 var partner = GetCitizen(p.PartnerId); if (partner != null && !family.Contains(partner)) partner.PartnerId = -1;
                 People.Remove(p); Fled++;
             }
-            Crown.Favour = Clamp(Crown.Favour - 1.5f, 0, 100);
             Rehouse(); AssignStrips(); Hire();
             if (ReeveId < 0) ChooseReeve(true);
         }
@@ -284,7 +288,7 @@ namespace MedievalTown.Simulation
             home.Stock[(int)Good.Grain] += 30;
             foreach (var p in People.Where(p => p.Family == fam && p.HomeId < 0 && p.ArrivedDay == Day)) { p.HomeId = home.Id; p.Loyalty = 60; }
             AddLog(rank == Rank.Freeman ? "A freeman, " + dad.Name + ", came with his family looking for work and took the empty house."
-                                        : dad.Name + " and his family came to " + ManorName + " seeking the lord's protection, and swore to him as his villeins.", LogKind.Good);
+                                        : dad.Name + " and his family came to " + ManorName + " seeking the king's protection, and swore to serve the crown as villeins.", LogKind.Good);
             Rehouse(); AssignStrips(); Hire();
         }
 
@@ -294,11 +298,17 @@ namespace MedievalTown.Simulation
         public string Title(Citizen p)
         {
             if (p == null) return "nobody";
-            if (p.Id == LordId && !p.IsChild) return (p.Female ? "Lady " : "Lord ") + p.First + " " + p.Family;
-            if (p.Id == LordId) return "the young lord " + p.First;
+            if (p.Id == KingId) return (p.Female ? "Queen " : "King ") + p.First;
             if (p.Rank == Rank.Knight) return "Sir " + p.First + " " + p.Family;
             if (p.Rank == Rank.Priest) return "Father " + p.First;
-            if (p.Rank == Rank.Noble) return (p.Female ? "Lady " : "") + p.First + " " + p.Family;
+            if (p.Rank == Rank.Noble)
+            {
+                bool consort = p.PartnerId >= 0 && p.PartnerId == KingId;
+                bool born = p.MotherId >= 0 || p.FatherId >= 0 || p.IsChild;
+                if (p.Female) return (consort ? "Queen " : born ? "Princess " : "Queen dowager ") + p.First;
+                return (consort ? "Prince consort " : "Prince ") + p.First;
+            }
+            if (p.Rank == Rank.Bailiff) return "Bailiff " + p.First + " " + p.Family;
             if (p.Id == ReeveId) return p.Name + " the reeve";
             return p.Name;
         }

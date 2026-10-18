@@ -165,6 +165,10 @@ namespace MedievalTown.Game.Art
                 {
                     case Rank.Reeve:
                         L.Shirt = "#3e6a3a"; L.Hat = "hood"; L.HatColor = "#2e4a2e"; L.Neck = "#2e4a2e"; break;
+                    case Rank.Bailiff:
+                        // a long dark gown, a felt hat, and the king's colours at the neck
+                        L.Shirt = "#2e3e5a"; L.Pant = "#2a2a34"; L.Coat = true; L.Hat = "felt"; L.HatColor = "#1e2a3a"; L.Neck = HouseColour; L.Apron = null; L.Shawl = null; L.Shoe = "#2a1e1a";
+                        break;
                     case Rank.Priest:
                         L.Shirt = "#24202a"; L.Pant = "#24202a"; L.Coat = true; L.Collar = true; L.Hat = null; L.Neck = null; L.Apron = null; L.Shawl = null;
                         L.Tonsure = true; L.Bald = false; L.Beard = null; L.HairStyle = "short";
@@ -173,21 +177,21 @@ namespace MedievalTown.Game.Art
                         L.Mail = true; L.Shirt = "#efe6d2"; L.Jacket = "#8a8e96"; L.Pant = "#7a7e86"; L.Hat = "helm"; L.HatColor = "#9a9ea6";
                         L.Neck = null; L.Apron = null; L.Badge = true; L.Shoe = "#3a3a3a";
                         break;
-                    case Rank.Lord: case Rank.Noble:
+                    case Rank.King: case Rank.Noble:
                     {
                         bool rules = Rules != null && Rules(p);
                         L.Apron = null; L.Shawl = null; L.Neck = null;
                         if (L.Female)
                         {
                             L.Shirt = Pick(NobleGowns, R(35)); L.Hat = "veil"; L.HatColor = "#fffaf0";
-                            if (rules || p.Rank == Rank.Lord) L.Hat = "crownveil";
+                            if (rules || p.Rank == Rank.King) L.Hat = "crownveil";
                         }
                         else
                         {
                             L.Shirt = Pick(NobleGowns, R(35)); L.Pant = "#3a2a3a";
-                            L.Hat = rules || p.Rank == Rank.Lord ? "circlet" : (R(36) < 0.5f ? "felt" : null); L.HatColor = rules ? "#e0b04a" : "#4a2a3a";
+                            L.Hat = p.Rank == Rank.King ? "crown" : rules ? "circlet" : (R(36) < 0.5f ? "felt" : null); L.HatColor = rules || p.Rank == Rank.King ? "#e0b04a" : "#4a2a3a";
                         }
-                        if (rules || p.Rank == Rank.Lord) { L.Jacket = Pick(Mantles, R(37)); L.Coat = true; }
+                        if (rules || p.Rank == Rank.King) { L.Jacket = Pick(Mantles, R(37)); L.Coat = true; }
                         L.Shoe = "#2a1e1a";
                         break;
                     }
@@ -496,6 +500,11 @@ namespace MedievalTown.Game.Art
                         else if (dir == Up) { RR(1, by - 2, 7, 7, hc); RR(6, by - 1, 2, 6, hs); RR(1, by + 5, 7, 1, hs); }
                         else { RR(1, by - 2, 6, 3, hc); RR(4, by + 1, 3, 6, hc); RR(6, by + 1, 1, 6, hs); }
                         if (L.Hat == "crownveil") { RR(1, by - 2, 7, 1, "#e0b04a"); if (dir == Down) P(4, by - 3, "#c84a3a"); }
+                        break;
+                    case "crown":   // the king's crown: a gold band with tall points and a red stone
+                        RR(1, by - 2, 7, 2, hc); RR(1, by - 4, 1, 2, hc); RR(4, by - 4, 1, 2, hc); RR(7, by - 4, 1, 2, hc);
+                        P(1, by - 5, "#fff0a0"); P(4, by - 5, "#fff0a0"); P(7, by - 5, "#fff0a0");
+                        RR(2, by - 3, 5, 1, "#a8202a"); if (dir == Down) P(4, by - 2, "#c84a3a"); RR(6, by - 2, 2, 2, "#c89a3a");
                         break;
                     case "circlet":   // a gold circlet on the brow
                         RR(1, by - 1, 7, 1, hc); P(2, by - 2, hc); P(4, by - 2, hc); P(6, by - 2, hc); if (dir == Down) P(4, by - 1, "#c84a3a"); break;

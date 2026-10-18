@@ -35,6 +35,9 @@ namespace MedievalTown.Simulation
         public int Graves;
         // Alehouse: cups sold today
         public int SoldToday;
+        // Taxes: what a household owes and hasn't yet handed to the reeve; the coin in the bailiff's chest
+        public float OwedGrain, OwedCoin, Arrears;
+        public float Coin;
 
         public BuildingDef Def { get { return Defs.Get(Type); } }
         public bool Contains(int tx, int ty)
@@ -81,38 +84,61 @@ namespace MedievalTown.Simulation
         public int MassDay = -999;       // last Sunday at mass
         public int AleDay = -999;        // last cup at the alehouse
         public int Pregnant;             // days to go
+        public float Honesty = 0.7f;     // 0..1: officers below about 0.6 take more than their due
         public string Name { get { return First + " " + Family; } }
         public bool IsChild { get { return Age < Balance.AdultAge; } }
-        public bool IsNoble { get { return Rank == Rank.Lord || Rank == Rank.Noble; } }
+        public bool IsNoble { get { return Rank == Rank.King || Rank == Rank.Noble; } }
     }
 
-    /// <summary>The lord's rules for the manor: what the serfs owe and how the lord trades.</summary>
+    /// <summary>The crown's rules for the village: what the serfs owe, how taxes are collected, how the crown trades.</summary>
     [Serializable]
     public class ManorPolicy
     {
-        public int WeekWork = 2;           // days a week each serf owes on the lord's land
-        public float Rent = 1f;            // coin per freeman household per week
-        public float Tallage = 1f;         // coin per serf household, taken at Martinmas (start of winter)
-        public float Multure = 0.08f;      // the lord's share of every sack ground at the mill
-        public float GrainPrice = 0.2f;     // what freemen pay for a measure of the lord's grain
-        public float FreeWage = 0.6f;      // a day's pay for freemen working for the lord
+        public int WeekWork = 2;           // days a week each serf owes on the king's land
+        public float HarvestTax = 0.15f;   // share of every strip's harvest owed in grain
+        public float HearthTax = 0.1f;     // coin per household per week
+        public float Rent = 1f;            // coin per freeman household per week, on top of the hearth tax
+        public float Tallage = 1f;         // coin per serf household, assessed at Martinmas (start of winter)
+        public float ReeveCut = 0.05f;     // the reeve's share of what he collects
+        public float BailiffCut = 0.1f;    // the bailiff's share of what he takes on to the castle
+        public float Multure = 0.08f;      // the crown's share of every sack ground at the mill
+        public float GrainPrice = 0.2f;    // what freemen pay for a measure of the king's grain
+        public float FreeWage = 0.6f;      // a day's pay for freemen working for the crown
         public bool Dole = true;           // the granary feeds the hungry
         public bool SellSurplus = true;    // the merchant buys the granary's grain above the reserve
         public float Reserve = 200f;       // grain the granary keeps back beyond the household's needs until harvest
         public bool BuyMaterials = true;   // buy timber and stone from the merchant for waiting building sites
-        public float CoinReserve = 60f;    // coin the treasury won't spend on materials (the king's tribute)
+        public float CoinReserve = 40f;    // coin the treasury won't spend on materials
     }
 
-    /// <summary>The king, far away, and how he regards this manor.</summary>
+    /// <summary>Where the taxes went: assessed on the households, collected by the reeve, taken on by the bailiff, received by the king.</summary>
+    [Serializable]
+    public class TaxBook
+    {
+        public float AssessedCoin, AssessedGrain;          // what households were told they owe
+        public float CollectedCoin, CollectedGrain;        // what the reeve brought to the bailiff (after his cut)
+        public float ReeveCutCoin, ReeveCutGrain;
+        public float BailiffCutCoin, BailiffCutGrain;
+        public float ReceivedCoin, ReceivedGrain;          // what reached the castle
+        public float Unpaid;                               // coin households couldn't pay (still owed)
+        public void Clear() { AssessedCoin = AssessedGrain = CollectedCoin = CollectedGrain = ReeveCutCoin = ReeveCutGrain = BailiffCutCoin = BailiffCutGrain = ReceivedCoin = ReceivedGrain = Unpaid = 0; }
+        public void Add(TaxBook o)
+        {
+            AssessedCoin += o.AssessedCoin; AssessedGrain += o.AssessedGrain; CollectedCoin += o.CollectedCoin; CollectedGrain += o.CollectedGrain;
+            ReeveCutCoin += o.ReeveCutCoin; ReeveCutGrain += o.ReeveCutGrain; BailiffCutCoin += o.BailiffCutCoin; BailiffCutGrain += o.BailiffCutGrain;
+            ReceivedCoin += o.ReceivedCoin; ReceivedGrain += o.ReceivedGrain; Unpaid += o.Unpaid;
+        }
+    }
+
+    /// <summary>The state of the realm: whether the village has risen.</summary>
     [Serializable]
     public class Crown
     {
-        public string King;
-        public float Favour = Balance.StartFavour;
-        public int TributeYear;            // the last year tribute was settled
-        public float LastTribute, LastDue;
-        public bool Stripped;              // the king has taken the manor back: game over
-        public int SuitorDay = -1;         // a bride the king promised arrives on this day
+        public int LowDays;                // days in a row loyalty has been near nothing
+        public bool Stripped;              // the village rose and deposed the king: game over
+        public int SuitorDay = -1;         // a royal bride arrives on this day
+        public int BailiffDay = -1;        // a new bailiff arrives on this day
+        public int GrumbleDay = -999;      // the last time the villagers complained about the reeve
     }
 
     [Serializable]
@@ -127,6 +153,6 @@ namespace MedievalTown.Simulation
     public class HistoryPoint
     {
         public int Day, Population;
-        public float Coin, Grain, Loyalty, Favour;
+        public float Coin, Grain, Loyalty;
     }
 }

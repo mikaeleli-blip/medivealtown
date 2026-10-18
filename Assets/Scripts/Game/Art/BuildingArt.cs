@@ -53,6 +53,7 @@ namespace MedievalTown.Game.Art
                 case BuildingType.Alehouse: return 16;
                 case BuildingType.Pavilion: return 18;
                 case BuildingType.Cart: return 8;
+                case BuildingType.BailiffHall: return 20;
                 default: return 0;
             }
         }
@@ -240,6 +241,7 @@ namespace MedievalTown.Game.Art
                 case BuildingType.Alehouse: Alehouse(k); break;
                 case BuildingType.Pavilion: Pavilion(k); break;
                 case BuildingType.Cart: Wagon(k); break;
+                case BuildingType.BailiffHall: BailiffHall(k); break;
             }
             k.Tg.Outline(OL);
             string n = type + "_" + v + "_" + si;
