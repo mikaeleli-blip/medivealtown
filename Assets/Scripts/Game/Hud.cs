@@ -118,7 +118,7 @@ namespace MedievalTown.Game
             int si = T.Season;
             Ui.IconAt(r.x + 9, r.y + 8, si == 3 ? Icon.Snow : si == 2 ? Icon.Leaf : Icon.Sun);
             Ui.Text(r.x + 22, r.y + 9, T.DateLabel, Ui.Title);
-            if (Ui.Hover(new Rect(r.x, r.y, r.width, 20))) hoverTip = T.Weekday + (T.IsSunday ? ": mass, and a day of rest." : T.IsWeekWorkDay ? ": week-work. Serfs labour on the king's land." : T.WeekdayIndex == 4 ? ": the reeve goes round collecting taxes." : T.IsMarketDay ? ": market day. The bailiff takes the taxes to the castle." : ": the serfs work their own strips.");
+            if (Ui.Hover(new Rect(r.x, r.y, r.width, 20))) hoverTip = T.Weekday + (T.IsSunday ? ": mass, and a day of rest." : T.IsWeekWorkDay ? ": week-work. Serfs labour on the king's land." : T.WeekdayIndex == 4 ? ": the reeve goes round collecting taxes." : T.IsMarketDay ? ": market day. The steward takes the taxes to the castle." : ": the serfs work their own strips.");
             var bar = new Rect(r.x + 9, r.y + 21, 132, 5);
             Ui.Fill(bar, Ui.Hex("#3b2618"));
             int segs = 24;
@@ -168,7 +168,7 @@ namespace MedievalTown.Game
                 "Grown folk + children",
                 "Loyalty to the crown: fed, warm, housed, not too burdened, not squeezed by the reeve, God-fearing. Below 15 families slip away by night; near nothing for two weeks and the village rises.",
                 "Piety: mass every Sunday keeps it up. A devout village is a more loyal one.",
-                "Taxes that reached the castle last week: coin + grain. They climb from the households to the reeve, the bailiff and the king.",
+                "Taxes that reached the castle last week: coin + grain. They climb from the households to the reeve, the steward and the king.",
                 "Folk without a roof. Tents are no use in autumn and winter.",
             };
             float w = 12; foreach (var kv in items) w += 14 + PixelFont.Width(kv.Value) + 10;
@@ -201,8 +201,11 @@ namespace MedievalTown.Game
             if (noStrip > 0) lines.Add(new KeyValuePair<string, bool>((noStrip == 1 ? "A serf family has" : noStrip + " serf families have") + " no strip field. They'll go hungry.", true));
             float need = T.HouseholdKeep;
             if (si <= 1 && need > 0 && T.StoreStock(Good.Grain) < need * 0.9f) lines.Add(new KeyValuePair<string, bool>("The granary won't feed the court until harvest.", T.StoreStock(Good.Grain) < need * 0.5f));
-            if (T.Bailiff == null) lines.Add(new KeyValuePair<string, bool>("No bailiff: the reeve carries the taxes to the castle himself until a new one comes.", false));
-            if (T.Reeve == null) lines.Add(new KeyValuePair<string, bool>("No reeve: nobody is collecting the taxes.", true));
+            if (T.Steward == null) lines.Add(new KeyValuePair<string, bool>("No steward: the tax chest waits until a new one comes.", false));
+            foreach (var v in T.Villages) if (T.ReeveOf(v) == null && T.PopulationOf(v) > 0) lines.Add(new KeyValuePair<string, bool>("No reeve in " + v.Name + ": nobody is collecting its taxes.", true));
+            foreach (var bar in T.Baronies) if (bar.Rebel) lines.Add(new KeyValuePair<string, bool>(T.Title(T.GetCitizen(bar.BaronId)) + " is withholding his taxes.", true));
+            int outside = T.Buildings.Count(b => b.Built && Town.IsPeasantHome(b.Type) && b.Residents.Count > 0 && b.VillageId < 0);
+            if (outside > 0) lines.Add(new KeyValuePair<string, bool>((outside == 1 ? "A house stands" : outside + " houses stand") + " outside every village and pay no taxes. Build a Village Cross near them.", false));
             if (T.Crown.LowDays > 0) lines.Add(new KeyValuePair<string, bool>("The village is close to rising (" + (Balance.RevoltDays - T.Crown.LowDays) + " days).", true));
             if (T.AverageLoyalty < 25 && T.Crown.LowDays == 0) lines.Add(new KeyValuePair<string, bool>("Loyalty is very low. Families will start to flee.", true));
             if (T.Sites.Any(s => s.MaterialsFraction < 1 && s.Progress >= s.MaterialsFraction * s.Def.Work - 0.5f) && T.StoreStock(Good.Timber) < 1 && T.StoreStock(Good.Stone) < 1)
@@ -233,7 +236,7 @@ namespace MedievalTown.Game
             Ui.Text(r.xMax - 8, r.y + 9, M(T.Coin), T.Coin < 0 ? Ui.Bad : Ui.Title, Ui.Align.Right);
             if (Ui.Hover(r)) hoverTip = "Coin in the royal treasury. Last week " + M(T.LastIn) + " came in and " + M(T.LastOut) + " went out.";
             Icon[] icons = { Icon.Crown, Icon.Scales, Icon.People, Icon.Book };
-            string[] names = { "The Court: the royal family, the bailiff, the reeve and the tax chain", "The Laws: taxes, dues and how the crown trades", "Folk: everyone in the village", "The Chronicle: what's been happening" };
+            string[] names = { "The Court: the royal family, the steward, the reeve and the tax chain", "The Laws: taxes, dues and how the crown trades", "Folk: everyone in the village", "The Chronicle: what's been happening" };
             for (int i = 0; i < 4; i++)
             {
                 var b = Block(new Rect(W - 160 + i * 39, 30, 37, 18));
@@ -510,35 +513,40 @@ namespace MedievalTown.Game
             Row("Seat", T.Keep != null ? "The castle" : "A pavilion (no castle yet)", T.Keep != null ? Ui.Ink : Ui.Warn);
 
             Heading("The tax chain");
-            Para("Households owe a share of their harvest in grain and a hearth tax in coin (freemen pay rent too; serfs tallage at Martinmas). Every Friday the reeve collects door to door and carries it to the bailiff. Every Saturday the bailiff carries the chest to the castle. Each keeps a share.");
-            var reeve = T.Reeve; var bailiff = T.Bailiff;
-            PersonLine(reeve, "Reeve");
-            if (reeve != null)
+            Para("Households owe a share of their harvest in grain and a hearth tax in coin (freemen pay rent too; serfs tallage at Martinmas). Friday each village's reeve collects door to door into the chest at the village cross. Saturday each baron's collector brings his villages' chests to the manor. Monday the steward's collector rides to the manors and the crown's villages. Tuesday the steward carries it all to the castle. Each keeps a share.");
+            var steward = T.Steward;
+            PersonLine(steward, "Steward");
+            if (steward != null)
             {
-                Row("Reeve's share", Mathf.RoundToInt(T.Policy.ReeveCut * 100) + "%");
-                Row("Chosen by", "the villagers, each spring");
-            }
-            if (Ui.Button(new Rect(bx, by, bw, 14), "Have the village choose a new reeve")) Later(() => T.NewReeve());
-            by += 18;
-            PersonLine(bailiff, "Bailiff");
-            if (bailiff != null)
-            {
-                Row("Bailiff's share", Mathf.RoundToInt(T.Policy.BailiffCut * 100) + "%");
+                Row("Steward's share", Mathf.RoundToInt(T.Policy.StewardCut * 100) + "%");
                 var chest = T.TaxChest;
-                if (chest != null) Row("In the tax chest", M(chest.Coin) + " · " + Mathf.FloorToInt(chest.Stock[(int)Good.Grain]) + " grain");
-                Row("Lives at", T.BailiffHall != null ? "the Bailiff's Hall" : "the court (no hall yet)", T.BailiffHall != null ? Ui.Ink : Ui.Warn);
+                if (chest != null) Row("In the tax chest", M(chest.Coin) + " · " + Mathf.FloorToInt(chest.ChestGrain) + " grain");
+                Row("Lives at", T.StewardHall != null ? "the Steward's Hall" : "the court (no hall yet)", T.StewardHall != null ? Ui.Ink : Ui.Warn);
                 bool confirm = confirmDismissUntil > Time.unscaledTime;
-                if (Ui.Button(new Rect(bx, by, bw, 14), confirm ? "Click again to dismiss " + bailiff.First : "Dismiss the bailiff"))
+                if (Ui.Button(new Rect(bx, by, bw, 14), confirm ? "Click again to dismiss " + steward.First : "Dismiss the steward"))
                 {
-                    if (confirm) Later(() => T.DismissBailiff()); else confirmDismissUntil = Time.unscaledTime + 3f;
+                    if (confirm) Later(() => T.DismissSteward()); else confirmDismissUntil = Time.unscaledTime + 3f;
                 }
                 by += 18;
             }
-            else Row("Bailiff", T.Crown.BailiffDay >= 0 ? "a new one arrives in " + Mathf.Max(0, T.Crown.BailiffDay - T.Day) + " days" : "none", Ui.Warn);
+            else Row("Steward", T.Crown.StewardDay >= 0 ? "a new one arrives in " + Mathf.Max(0, T.Crown.StewardDay - T.Day) + " days" : "none", Ui.Warn);
+            var crownCol = T.GetCitizen(T.Crown.CollectorId);
+            if (crownCol != null) PersonLine(crownCol, "Steward's collector");
+            else if (T.Villages.Count > 1) Row("Steward's collector", "none yet: only the capital's chest is fetched", Ui.Warn);
+
+            Heading("The realm");
+            foreach (var bar in T.Baronies) BaronyBlock(bar);
+            var crownVillages = T.Villages.Where(v => v.BaronyId < 0).ToList();
+            if (crownVillages.Count > 0)
+            {
+                Ui.Text(bx, by, "The crown's own villages", Ui.Title); by += 12;
+                foreach (var v in crownVillages) VillageBlock(v);
+            }
+            if (T.Villages.Count <= 1) Para("Found more villages with a Village Cross (Realm tab). A Baron's Manor in one of them raises a barony: villages founded near it owe their taxes to the baron, and he to the crown.");
 
             TaxLedger("This year", T.Taxes);
             if (T.LastTaxes.AssessedCoin + T.LastTaxes.AssessedGrain > 0) TaxLedger("Last year", T.LastTaxes);
-            Para("The reeve's and bailiff's shares are set in the Laws. If an officer takes more than his share it shows here, or in the grumbling of the village.");
+            Para("The reeves', barons' and steward's shares are set in the Laws. If an officer takes more than his share it shows here, or in the grumbling of the village.");
 
             Heading("The church");
             PersonLine(T.Priest, "Parish priest");
@@ -563,6 +571,51 @@ namespace MedievalTown.Game
         }
 
         float confirmDismissUntil;
+        int confirmStrip = -1; float confirmStripUntil;
+
+        void VillageBlock(Village v)
+        {
+            var rr = new Rect(bx, by - 1, bw, 11);
+            if (Ui.Hover(rr)) Ui.Fill(rr, Ui.Hex("#ecd09a"));
+            Ui.Text(bx, by, v.Name + (v.Capital ? " (capital)" : ""), Ui.Ink);
+            Ui.Text(bx + bw, by, T.PopulationOf(v) + " folk", Ui.InkSoft, Ui.Align.Right);
+            var cross = T.CrossOf(v);
+            if (Ui.Clickable(rr) && cross != null) { var c = cross; Later(() => { gc.Select(Selection.Building(c.Id)); gc.CenterOn(new Vector2((c.X + 1) * 16, (c.Y + 1) * 16)); }); }
+            by += 11;
+            PersonLine(T.ReeveOf(v), "  Reeve");
+            Row("  Last week", M(v.LastCoin) + " · " + Mathf.FloorToInt(v.LastGrain) + " grain");
+            if (Ui.Button(new Rect(bx + 8, by, bw - 8, 13), "Have " + v.Name + " choose a new reeve")) { var vv = v; Later(() => T.NewReeve(vv)); }
+            by += 17;
+        }
+
+        void BaronyBlock(Barony bar)
+        {
+            var baron = T.GetCitizen(bar.BaronId);
+            Ui.Text(bx, by, Cap(T.BaronyName(bar)), Ui.Title); by += 12;
+            if (baron != null)
+            {
+                PersonLine(baron, "Baron");
+                Row("Temperament", Defs.TraitNames[(int)baron.Trait]);
+                Meter("Loyal to the crown", bar.Loyalty);
+                if (bar.Rebel) Para("He refuses to send his taxes. Lower the harvest tax or raise the barons' share to win him back, or strip his title.", Ui.Bad);
+                Row("Sent on last week", M(bar.LastCoin) + " · " + Mathf.FloorToInt(bar.LastGrain) + " grain");
+                var manor = T.GetBuilding(bar.ManorId);
+                if (manor != null && (manor.Coin > 0.01f || manor.ChestGrain > 0.5f)) Row("In his chest", M(manor.Coin) + " · " + Mathf.FloorToInt(manor.ChestGrain) + " grain");
+                bool confirm = confirmStrip == bar.Id && confirmStripUntil > Time.unscaledTime;
+                if (Ui.Button(new Rect(bx, by, bw, 14), confirm ? "Click again: the other barons will be uneasy" : "Strip " + baron.First + " of his title"))
+                {
+                    if (confirm) { var bb = bar; Later(() => T.StripBaron(bb)); confirmStrip = -1; }
+                    else { confirmStrip = bar.Id; confirmStripUntil = Time.unscaledTime + 3f; }
+                }
+                by += 18;
+            }
+            else Row("Baron", bar.BaronDue >= 0 ? "a new one arrives in " + Mathf.Max(0, bar.BaronDue - T.Day) + " days" : "none", Ui.Warn);
+            PersonLine(T.GetCitizen(bar.CollectorId), "Baron's collector");
+            foreach (var v in T.VillagesOf(bar)) VillageBlock(v);
+            by += 4;
+        }
+
+        static string Cap(string s) { return string.IsNullOrEmpty(s) ? s : char.ToUpper(s[0]) + s.Substring(1); }
 
         /// <summary>Where the taxes went, step by step up the chain. Grain is valued at the merchant's price.</summary>
         void TaxLedger(string title, TaxBook t)
@@ -570,11 +623,13 @@ namespace MedievalTown.Game
             Heading("Taxes, " + title.ToLower());
             Row("Owed by households", M(t.AssessedCoin) + " · " + Mathf.FloorToInt(t.AssessedGrain) + " grain");
             Row("Reeve kept", M(t.ReeveCutCoin) + " · " + Mathf.FloorToInt(t.ReeveCutGrain) + " grain");
-            Row("Reeve handed on", M(t.CollectedCoin) + " · " + Mathf.FloorToInt(t.CollectedGrain) + " grain");
-            float share = T.Policy.BailiffCut;
-            float handed = t.CollectedCoin + t.CollectedGrain * Balance.MerchantGrain, kept = t.BailiffCutCoin + t.BailiffCutGrain * Balance.MerchantGrain;
+            Row("Reeves handed on", M(t.CollectedCoin) + " · " + Mathf.FloorToInt(t.CollectedGrain) + " grain");
+            if (t.BaronCutCoin + t.BaronCutGrain > 0.01f) Row("Barons kept", M(t.BaronCutCoin) + " · " + Mathf.FloorToInt(t.BaronCutGrain) + " grain");
+            if (t.Withheld > 0.05f) Row("Withheld by rebels", M(t.Withheld), Ui.Bad);
+            float share = T.Policy.StewardCut;
+            float handed = t.ReceivedCoin + t.StewardCutCoin + (t.ReceivedGrain + t.StewardCutGrain) * Balance.MerchantGrain, kept = t.StewardCutCoin + t.StewardCutGrain * Balance.MerchantGrain;
             bool over = handed > 3 && kept > handed * (share + 0.04f);
-            Row("Bailiff kept", M(t.BailiffCutCoin) + " · " + Mathf.FloorToInt(t.BailiffCutGrain) + " grain", over ? Ui.Bad : Ui.Ink);
+            Row("Steward kept", M(t.StewardCutCoin) + " · " + Mathf.FloorToInt(t.StewardCutGrain) + " grain", over ? Ui.Bad : Ui.Ink);
             if (over) Row("", "about " + Mathf.RoundToInt(kept / Mathf.Max(0.01f, handed) * 100) + "% instead of " + Mathf.RoundToInt(share * 100) + "%", Ui.Bad);
             Row("Reached the castle", M(t.ReceivedCoin) + " · " + Mathf.FloorToInt(t.ReceivedGrain) + " grain", Ui.Good);
             float unpaid = t == T.Taxes ? T.Buildings.Where(b => b.Built && Town.IsPeasantHome(b.Type)).Sum(b => b.OwedCoin) : t.Unpaid;
@@ -606,8 +661,10 @@ namespace MedievalTown.Game
             Heading("The officers' shares");
             pol.ReeveCut = SliderRow("Reeve's share", Mathf.RoundToInt(pol.ReeveCut * 100) + "% of what he collects", pol.ReeveCut, 0, 0.25f, 0.01f,
                 "What the reeve keeps for his trouble.");
-            pol.BailiffCut = SliderRow("Bailiff's share", Mathf.RoundToInt(pol.BailiffCut * 100) + "% of what he carries", pol.BailiffCut, 0, 0.3f, 0.01f,
-                "What the bailiff keeps of the chest before it reaches the castle.");
+            pol.StewardCut = SliderRow("Steward's share", Mathf.RoundToInt(pol.StewardCut * 100) + "% of what he carries", pol.StewardCut, 0, 0.3f, 0.01f,
+                "What the steward keeps of the chest before it reaches the castle.");
+            pol.BaronCut = SliderRow("Barons' share", Mathf.RoundToInt(pol.BaronCut * 100) + "% of what their collectors bring", pol.BaronCut, 0, 0.4f, 0.01f,
+                "What each baron keeps of his villages' taxes. Barons grow restless below 15%, and one pushed too far withholds everything.");
             Heading("What the serfs owe");
             pol.WeekWork = Mathf.RoundToInt(SliderRow("Week-work", pol.WeekWork + " days a week", pol.WeekWork, 0, 5, 1,
                 "Days each serf labours on the king's demesne and building sites before working their own strip. Two is the custom: more feeds the crown but starves the strips and sours the village."));
@@ -743,14 +800,14 @@ namespace MedievalTown.Game
             if (w != null) Row("Trade", w.Def.Name);
             var strip = p.Rank == Rank.Serf || p.Rank == Rank.Reeve ? T.StripOf(p) : null;
             if (p.Rank == Rank.Serf || p.Rank == Rank.Reeve) Row("Family strip", strip != null ? Mathf.RoundToInt(strip.CropGrowth * 100) + "% grown" : "none", strip != null ? Ui.Ink : Ui.Bad);
-            if (!p.IsNoble && p.Rank != Rank.Priest && p.Rank != Rank.Knight && p.Rank != Rank.Bailiff && !p.IsChild) Meter("Loyalty", p.Loyalty);
+            if (!p.IsNoble && p.Rank != Rank.Priest && p.Rank != Rank.Knight && p.Rank != Rank.Steward && !p.IsChild) Meter("Loyalty", p.Loyalty);
             Meter("Piety", p.Piety);
             Meter("Health", p.Health);
             Row("Fed", p.Fed >= 0.95f ? "well" : p.Fed >= 0.6f ? "short" : "hungry", p.Fed >= 0.95f ? Ui.Good : p.Fed >= 0.6f ? Ui.Warn : Ui.Bad);
             Row("Warm", p.Warm ? "yes" : "no", p.Warm ? Ui.Good : Ui.Bad);
-            if (!p.IsChild && !p.IsNoble && p.Rank != Rank.Bailiff && p.Rank != Rank.Reeve) Row("Coin", M(p.Coin));
+            if (!p.IsChild && !p.IsNoble && p.Rank != Rank.Steward && p.Rank != Rank.Reeve) Row("Coin", M(p.Coin));
             if (p.IsNoble || p.Rank == Rank.Knight) Row("Temperament", Defs.TraitNames[(int)p.Trait]);
-            if (p.Rank == Rank.Bailiff || p.Rank == Rank.Reeve) Row("Purse", M(p.Coin), p.Coin > 20 ? Ui.Warn : Ui.Ink);
+            if (p.Rank == Rank.Steward || p.Rank == Rank.Reeve) Row("Purse", M(p.Coin), p.Coin > 20 ? Ui.Warn : Ui.Ink);
             if (p.Pregnant > 0) Row("Expecting", "in " + p.Pregnant + " days");
             Heading("Family");
             var partner = T.GetCitizen(p.PartnerId);
@@ -777,7 +834,12 @@ namespace MedievalTown.Game
             var b = T.GetBuilding(gc.Selected.Id);
             if (b == null) { Later(() => gc.Select(Selection.None)); return; }
             var d = b.Def;
-            Ui.Text(bx, by, b.Type == BuildingType.Church ? T.ChurchName + " Church" : b.Type == BuildingType.Keep ? "Castle " + T.ManorName : d.Name, Ui.Title); by += 12;
+            var vil = T.VillageOf(b);
+            string title = b.Type == BuildingType.Church ? T.ChurchName + " Church" : b.Type == BuildingType.Keep ? "Castle " + T.ManorName
+                         : b.Type == BuildingType.VillageCross && vil != null ? vil.Name + " Cross" : b.Type == BuildingType.Manor && vil != null ? "The manor of " + vil.Name : d.Name;
+            Ui.Text(bx, by, title, Ui.Title); by += 12;
+            if (b.Type != BuildingType.VillageCross && b.Type != BuildingType.Road && !d.IsWall && b.Type != BuildingType.Pavilion && b.Type != BuildingType.Cart)
+                Row("Village", vil != null ? vil.Name : "none: outside every village", vil != null ? Ui.Ink : Ui.Warn);
             if (!b.Built)
             {
                 Row("Labour", Mathf.RoundToInt(b.Progress) + " of " + d.Work + " days");
@@ -814,7 +876,7 @@ namespace MedievalTown.Game
                     if (b.Type == BuildingType.Quarry) Row("Stone", T.QuarryOnHill(b) ? "a hillside face" : T.RocksNear(b) + " boulders in reach");
                     if (b.Employees.Count > 0 && !T.TradeNeeded(b)) Para("Idle: the stores are full and nothing waits on it.");
                 }
-                if (b.Type == BuildingType.Granary || b.Type == BuildingType.Cart || Town.IsPeasantHome(b.Type) || b.Type == BuildingType.Church || b.Type == BuildingType.Alehouse || b.Type == BuildingType.BailiffHall)
+                if (b.Type == BuildingType.Granary || b.Type == BuildingType.Cart || Town.IsPeasantHome(b.Type) || b.Type == BuildingType.Church || b.Type == BuildingType.Alehouse || b.Type == BuildingType.StewardHall || b.Type == BuildingType.Manor)
                 {
                     bool any = false;
                     for (int g = 0; g < Balance.GoodCount; g++)
@@ -824,7 +886,9 @@ namespace MedievalTown.Game
                         Row(Defs.GoodNames[g], Mathf.FloorToInt(b.Stock[g]).ToString());
                     }
                 }
-                if (b.Coin > 0.01f) Row("Tax chest", M(b.Coin));
+                if (b.Type == BuildingType.VillageCross && vil != null) CrossPanel(b, vil);
+                if (b.Type == BuildingType.Manor) ManorPanel(b);
+                if (b.Coin > 0.01f || b.ChestGrain > 0.5f) Row("Tax chest", M(b.Coin) + " · " + Mathf.FloorToInt(b.ChestGrain) + " grain");
                 if (Town.IsPeasantHome(b.Type) && (b.OwedCoin > 0.01f || b.OwedGrain > 0.5f)) Row("Owes the reeve", M(b.OwedCoin) + " · " + Mathf.FloorToInt(b.OwedGrain) + " grain", b.Arrears > 0.5f ? Ui.Bad : Ui.Ink);
                 if (b.Type == BuildingType.Mill) Row("Ground today", Mathf.FloorToInt(T.Today != null ? T.Today.Milled : 0) + " grain");
                 if (b.Type == BuildingType.Church) { Row("At mass last Sunday", b.Attendance.ToString()); Row("Graves", b.Graves.ToString()); }
@@ -837,6 +901,51 @@ namespace MedievalTown.Game
                 {
                     if (confirm) { var bb = b; Later(() => { T.Remove(bb); gc.Select(Selection.None); confirmPullDown = -1; }); }
                     else confirmPullDown = b.Id;
+                }
+                by += 18;
+            }
+        }
+
+        void CrossPanel(Building b, Village v)
+        {
+            Row("Founded", v.Capital ? "the king's capital" : T.DateOf(v.Founded));
+            Row("Folk", T.PopulationOf(v).ToString());
+            PersonLine(T.ReeveOf(v), "Reeve");
+            Row("Answers to", T.LiegeName(v));
+            Row("Last week", M(v.LastCoin) + " · " + Mathf.FloorToInt(v.LastGrain) + " grain");
+            bool seat = T.Baronies.Any(x => x.SeatVillageId == v.Id);
+            if (!v.Capital && !seat && T.Baronies.Count > 0)
+            {
+                // cycle: the crown, then each barony
+                var ids = new List<int> { -1 }; ids.AddRange(T.Baronies.Select(x => x.Id));
+                int next = ids[(ids.IndexOf(v.BaronyId) + 1) % ids.Count];
+                var nb = T.GetBarony(next);
+                if (Ui.Button(new Rect(bx, by, bw, 14), "Give it to " + (nb != null ? T.BaronyName(nb) : "the crown"))) { var vv = v; Later(() => T.SetLiege(vv, next)); }
+                by += 18;
+            }
+            if (Ui.Button(new Rect(bx, by, bw, 14), "Have " + v.Name + " choose a new reeve")) { var vv = v; Later(() => T.NewReeve(vv)); }
+            by += 18;
+            if (v.Capital) Para("The capital's chest is fetched by the steward on Monday.");
+            else if (v.BaronyId >= 0) Para("Every Saturday the baron's collector empties this chest and takes it to the manor.");
+            else Para("The steward's collector empties this chest on Monday and takes it to the Steward's Hall.");
+        }
+
+        void ManorPanel(Building b)
+        {
+            var bar = T.Baronies.FirstOrDefault(x => x.ManorId == b.Id);
+            if (bar == null) { Para("No barony sits here.", Ui.Warn); return; }
+            Row("Villages", string.Join(", ", T.VillagesOf(bar).Select(v => v.Name).ToArray()));
+            Meter("Loyal to the crown", bar.Loyalty);
+            if (bar.Rebel) Para("The baron is withholding his taxes.", Ui.Bad);
+            var baron = T.GetCitizen(bar.BaronId);
+            if (baron == null) Row("Baron", bar.BaronDue >= 0 ? "arrives in " + Mathf.Max(0, bar.BaronDue - T.Day) + " days" : "none", Ui.Warn);
+            else
+            {
+                bool confirm = confirmStrip == bar.Id && confirmStripUntil > Time.unscaledTime;
+                if (Ui.Button(new Rect(bx, by, bw, 14), confirm ? "Click again: the other barons will be uneasy" : "Strip " + baron.First + " of his title"))
+                {
+                    if (confirm) { var bb = bar; Later(() => T.StripBaron(bb)); confirmStrip = -1; }
+                    else { confirmStrip = bar.Id; confirmStripUntil = Time.unscaledTime + 3f; }
                 }
                 by += 18;
             }
@@ -860,7 +969,9 @@ namespace MedievalTown.Game
                     var b = T.GetBuilding(pick.Id);
                     if (b != null)
                     {
-                        s = b.Def.Name + (b.Built ? "" : " (being built, " + Mathf.RoundToInt(b.BuildFraction * 100) + "%)");
+                        var bv = T.VillageOf(b);
+                        s = (b.Type == BuildingType.VillageCross && bv != null ? bv.Name + " Cross" : b.Def.Name) + (b.Built ? "" : " (being built, " + Mathf.RoundToInt(b.BuildFraction * 100) + "%)");
+                        if (b.Type == BuildingType.VillageCross && bv != null) s += "\nAnswers to " + T.LiegeName(bv);
                         if (b.Built && Town.IsHome(b.Type)) s += "\n" + (b.Residents.Count == 0 ? "Empty" : b.Residents.Count + " living here");
                         if (b.Built && b.Type == BuildingType.Strip) { var hd = T.GetCitizen(b.HolderId); s += "\n" + (hd != null ? "The " + hd.Family + " family's strips" : "No family holds it"); }
                     }
@@ -890,7 +1001,16 @@ namespace MedievalTown.Game
                 var a = gc.PlacementAnchor;
                 string err = T.CanPlace(gc.BuildType, a.x, a.y);
                 if (err != null) { s = err; c = Ui.Bad; }
-                else s = d.Name + (d.Type == BuildingType.Road ? "" : " · " + Town.MaterialsText(d));
+                else
+                {
+                    s = d.Name + (d.Type == BuildingType.Road ? "" : " · " + Town.MaterialsText(d));
+                    if (d.Type == BuildingType.VillageCross) { var lb = T.LiegeFor(a.x, a.y); s += "\nA new village, answering to " + (lb == null ? "the crown" : lb.BaronId >= 0 ? T.Title(T.GetCitizen(lb.BaronId)) : T.BaronyName(lb)); }
+                    else if (d.Type != BuildingType.Road && !d.IsWall)
+                    {
+                        var v = T.VillageAt(a.x + d.W / 2, a.y + d.H / 2);
+                        s += "\n" + (v != null ? "Part of " + v.Name : "Outside every village" + (Town.IsPeasantHome(d.Type) ? ": no taxes, no reeve" : ""));
+                    }
+                }
             }
             if (s == null) return;
             var m = Event.current.mousePosition;

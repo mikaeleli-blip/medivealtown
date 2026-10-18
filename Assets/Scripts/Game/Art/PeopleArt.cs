@@ -165,9 +165,19 @@ namespace MedievalTown.Game.Art
                 {
                     case Rank.Reeve:
                         L.Shirt = "#3e6a3a"; L.Hat = "hood"; L.HatColor = "#2e4a2e"; L.Neck = "#2e4a2e"; break;
-                    case Rank.Bailiff:
+                    case Rank.Steward:
                         // a long dark gown, a felt hat, and the king's colours at the neck
                         L.Shirt = "#2e3e5a"; L.Pant = "#2a2a34"; L.Coat = true; L.Hat = "felt"; L.HatColor = "#1e2a3a"; L.Neck = HouseColour; L.Apron = null; L.Shawl = null; L.Shoe = "#2a1e1a";
+                        break;
+                    case Rank.Baron:
+                        // a fur-trimmed gown in his house's wine red, a chaperon hat
+                        L.Apron = null; L.Shawl = null; L.Neck = null;
+                        L.Shirt = "#7a3a4a"; L.Pant = "#3a2a2a"; L.Coat = true; L.Jacket = "#5a2a34"; L.Hat = "felt"; L.HatColor = "#3a1e24"; L.Shoe = "#2a1e1a";
+                        if (L.Female) { L.Hat = "veil"; L.HatColor = "#efe6d2"; }
+                        break;
+                    case Rank.Collector:
+                        // a riding cloak, a satchel for the tallies
+                        L.Shirt = "#6a5a3a"; L.Pant = "#4a3a2a"; L.Hat = "hood"; L.HatColor = "#4a3a24"; L.Neck = "#4a3a24"; L.Apron = null; L.Badge = true; L.Shoe = "#2a1e1a";
                         break;
                     case Rank.Priest:
                         L.Shirt = "#24202a"; L.Pant = "#24202a"; L.Coat = true; L.Collar = true; L.Hat = null; L.Neck = null; L.Apron = null; L.Shawl = null;

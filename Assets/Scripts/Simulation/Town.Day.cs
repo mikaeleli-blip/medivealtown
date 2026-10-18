@@ -36,7 +36,7 @@ namespace MedievalTown.Simulation
         public void PlanDay()
         {
             foreach (var p in People) { p.Chore = Chore.None; p.TaskId = -1; }
-            var sites = Sites.Where(SiteCanProgress).OrderBy(s => s.Type == BuildingType.Road ? 9 : s.Def.IsWall ? 6 : s.Def.IsField ? 0 : s.Type == BuildingType.Granary ? 1 : s.Type == BuildingType.Mill ? 2 : s.Type == BuildingType.Cottage ? 3 : 4).ThenBy(s => s.Id).ToList();
+            var sites = Sites.Where(SiteCanProgress).OrderBy(s => s.Type == BuildingType.Road ? 9 : s.Def.IsWall ? 6 : s.Def.IsField ? 0 : s.Type == BuildingType.Granary || s.Type == BuildingType.VillageCross ? 1 : s.Type == BuildingType.Mill ? 2 : s.Type == BuildingType.Cottage ? 3 : 4).ThenBy(s => s.Id).ToList();
             var crew = sites.ToDictionary(s => s.Id, s => 0);
             var demesnes = OfType(BuildingType.Demesne).Where(FieldNeedsWork).ToList();
             // sites waiting on timber or stone the stores don't have: week-work goes to the quarry and the woods
@@ -70,11 +70,30 @@ namespace MedievalTown.Simulation
                         p.Chore = Chore.Patrol; continue;
                     case Rank.Priest:
                         p.Chore = Chore.Pray; p.TaskId = church != null ? church.Id : -1; continue;
-                    case Rank.Bailiff:
-                        // Saturday he carries the chest to the castle; other days he keeps the books
+                    case Rank.Steward:
+                        // Tuesday he carries the chest to the castle; other days he keeps the books
                         var chest = TaxChest;
-                        if (IsMarketDay && chest != null && (chest.Coin > 0.01f || chest.Stock[(int)Good.Grain] > 0.5f)) { p.Chore = Chore.Deliver; p.TaskId = chest.Id; }
+                        if (WeekdayIndex == 1 && chest != null && (chest.Coin > 0.01f || chest.ChestGrain > 0.5f)) { p.Chore = Chore.Deliver; p.TaskId = chest.Id; }
                         else { p.Chore = Chore.Accounts; p.TaskId = chest != null ? chest.Id : -1; }
+                        continue;
+                    case Rank.Baron:
+                        { var bar = BaronyOfBaron(p); p.Chore = Chore.Court; p.TaskId = bar != null ? bar.ManorId : -1; }
+                        continue;
+                    case Rank.Collector:
+                        if (p.Id == Crown.CollectorId)
+                        {
+                            // Monday he rides out to the crown's villages and the manors
+                            var ch = TaxChest;
+                            if (WeekdayIndex == 0) { p.Chore = Chore.Collect; p.TaskId = ch != null ? ch.Id : -1; }
+                            else { p.Chore = Chore.Accounts; p.TaskId = ch != null ? ch.Id : -1; }
+                        }
+                        else
+                        {
+                            // Saturday a baron's collector rides round the baron's villages
+                            var bar = BaronyOfBaron(p);
+                            p.Chore = bar != null && WeekdayIndex == 5 ? Chore.Collect : Chore.Accounts;
+                            p.TaskId = bar != null ? bar.ManorId : -1;
+                        }
                         continue;
                 }
                 if (IsSunday) { p.Chore = Chore.Rest; continue; }
@@ -94,9 +113,9 @@ namespace MedievalTown.Simulation
                 }
 
                 // the reeve's collecting day
-                if (p.Id == ReeveId && WeekdayIndex == 4) { p.Chore = Chore.Collect; p.TaskId = TaxChest != null && BailiffId >= 0 ? TaxChest.Id : seat != null ? seat.Id : -1; continue; }
+                if (p.Rank == Rank.Reeve && WeekdayIndex == 4) { var vc = CrossOf(VillageOf(p)); p.Chore = Chore.Collect; p.TaskId = vc != null ? vc.Id : -1; continue; }
                 // serfs and the reeve
-                if (IsWeekWorkDay || p.Id == ReeveId)
+                if (IsWeekWorkDay || p.Rank == Rank.Reeve)
                 {
                     var s = nextSite();
                     if (s != null) { p.Chore = Chore.Build; p.TaskId = s.Id; continue; }
@@ -130,7 +149,6 @@ namespace MedievalTown.Simulation
             if (Today == null) Today = new DayReport();
             Today = new DayReport();
             int si = Season;
-            float reeve = Reeve != null && Reeve.Health > 30 ? Balance.ReeveBonus : 1f;
 
             // ---- the day's work
             foreach (var p in People)
@@ -140,9 +158,9 @@ namespace MedievalTown.Simulation
                 var t = GetBuilding(p.TaskId);
                 switch (p.Chore)
                 {
-                    case Chore.OwnStrip: if (t != null) FieldWork(t, hands, reeve, HomeOf(GetCitizen(t.HolderId) ?? p)); break;
+                    case Chore.OwnStrip: if (t != null) FieldWork(t, hands, ReeveBonus(t), HomeOf(GetCitizen(t.HolderId) ?? p)); break;
                     case Chore.WeekWork:
-                        if (t != null && t.Def.IsField) FieldWork(t, hands, reeve, null);
+                        if (t != null && t.Def.IsField) FieldWork(t, hands, ReeveBonus(t), null);
                         else if (t != null) Materials(t, hands);
                         else PutInStores(Good.Firewood, Balance.GatherWood * hands);
                         break;
@@ -168,10 +186,12 @@ namespace MedievalTown.Simulation
             if (doy == Balance.SeasonStart(3)) Martinmas();
             if (doy == Balance.SeasonStart(3) + 6) Christmas();
             if (doy == Balance.SeasonStart(2) - 1) AutumnComes();
-            if (WeekdayIndex == 4) ReeveCollects();
-            if (IsMarketDay) { BailiffDelivers(); MarketDay(); }
-            if (IsSunday) { Weekly(); Trees(); }
-            BailiffArrives();
+            if (WeekdayIndex == 4) ReevesCollect();
+            if (IsMarketDay) { BaronsCollect(); MarketDay(); }
+            if (WeekdayIndex == 0) StewardCollects();
+            if (WeekdayIndex == 1) StewardDelivers();
+            if (IsSunday) { Weekly(); Trees(); BaronMoods(); ReeveVacancies(false); }
+            StewardArrives();
             CheckRevolt();
 
             Lives();
@@ -182,10 +202,17 @@ namespace MedievalTown.Simulation
             Rehouse(); AssignStrips(); Hire();
         }
 
+        /// <summary>Strips in a village with a reeve in office are worked better.</summary>
+        float ReeveBonus(Building strip)
+        {
+            var r = ReeveOf(VillageOf(strip));
+            return r != null && r.Health > 30 ? Balance.ReeveBonus : 1f;
+        }
+
         void SpringStart()
         {
             foreach (var f in Buildings.Where(b => b.Def.IsField)) { f.CropGrowth = 0; f.CropLeft = 0; f.Harvested = 0; }
-            ChooseReeve(false);
+            ReeveVacancies(true);
             if (Year > Balance.StartYear) AddLog("A new year, " + Year + ". The fields are ploughed and sown again.", LogKind.Info);
         }
 
@@ -225,7 +252,7 @@ namespace MedievalTown.Simulation
             if (pantry != null)
             {
                 pantry.Stock[(int)Good.Grain] += q - tithe;
-                Assess(pantry, 0, (q - tithe) * Policy.HarvestTax);   // the crown's share, for the reeve to collect
+                if (pantry.VillageId >= 0) Assess(pantry, 0, (q - tithe) * Policy.HarvestTax);   // the crown's share, for the reeve to collect (a house outside every village goes untaxed)
             }
             else PutInStores(Good.Grain, q - tithe);
             Today.Harvest += q; Today.Tithe += tithe;
@@ -466,7 +493,7 @@ namespace MedievalTown.Simulation
                 var home = HomeOf(p);
                 if (RoyalHousehold(p) || (p.Rank == Rank.Priest && church == null)) got = EatFromStores(need);
                 else if (p.Rank == Rank.Priest && church != null) { got = Eat(church.Stock, need); if (got < need) got += EatFromStores(need - got); }
-                else if (p.Rank == Rank.Bailiff) { if (home != null && home.Type == BuildingType.BailiffHall) got = Eat(home.Stock, need); if (got < need) got += EatFromStores(need - got); }
+                else if (p.Rank == Rank.Steward || p.Rank == Rank.Collector || p.Rank == Rank.Baron) { if (home != null && !IsPeasantHome(home.Type)) got = Eat(home.Stock, need); if (got < need) got += EatFromStores(need - got); }
                 else
                 {
                     // the toft garden gives a little each day outside winter
@@ -489,7 +516,7 @@ namespace MedievalTown.Simulation
             foreach (var home in Buildings.Where(b => b.Built && b.Residents.Count > 0))
             {
                 bool warm;
-                if (home.Type == BuildingType.Keep || home.Type == BuildingType.Pavilion || home.Type == BuildingType.Church || home.Type == BuildingType.BailiffHall)
+                if (home.Type == BuildingType.Keep || home.Type == BuildingType.Pavilion || home.Type == BuildingType.Church || home.Type == BuildingType.StewardHall || home.Type == BuildingType.Manor)
                 {
                     float need = home.Type == BuildingType.Keep ? Balance.KeepFirewood * Balance.FirewoodBySeason[si] / 0.6f : perHome;
                     warm = TakeFromStores(Good.Firewood, need) >= need * 0.9f || si == 1;
@@ -563,7 +590,7 @@ namespace MedievalTown.Simulation
             {
                 // piety fades without the church
                 p.Piety = Math.Max(0, p.Piety - (hasChurch && Priest != null ? 0.3f : 0.5f));
-                if (RoyalHousehold(p) || p.Rank == Rank.Priest || p.Rank == Rank.Bailiff || p.IsChild) { if (p.IsChild) p.Loyalty = 55; continue; }
+                if (RoyalHousehold(p) || IsOfficer(p) || p.IsChild) { if (p.IsChild) p.Loyalty = 55; continue; }
                 float target = 50 + trait;
                 target += p.Fed >= 0.95f ? 10 : p.Fed < 0.6f ? -25 : -8;
                 if (!p.Warm && Season >= 2) target -= 12;
@@ -575,7 +602,7 @@ namespace MedievalTown.Simulation
                 target += (p.Piety - 40) * 0.2f;
                 if (Day - p.AleDay < 7) target += 4;
                 if (hasKeep) target += 3;
-                if (p.Id == ReeveId) target += 8;
+                if (p.Rank == Rank.Reeve) target += 8;
                 if (Today.Cold > 0 && !p.Warm) target -= 4;
                 p.Loyalty = Clamp(p.Loyalty + (Clamp(target, 0, 100) - p.Loyalty) * 0.05f, 0, 100);
             }
@@ -585,7 +612,7 @@ namespace MedievalTown.Simulation
         void Flight()
         {
             int knights = People.Count(p => p.Rank == Rank.Knight && !p.IsChild);
-            foreach (var unit in People.Where(p => !RoyalHousehold(p) && p.Rank != Rank.Priest && p.Rank != Rank.Bailiff).GroupBy(HouseholdOf).ToList())
+            foreach (var unit in People.Where(p => !RoyalHousehold(p) && !IsOfficer(p)).GroupBy(HouseholdOf).ToList())
             {
                 var grown = unit.Where(p => !p.IsChild).ToList();
                 if (grown.Count == 0) continue;

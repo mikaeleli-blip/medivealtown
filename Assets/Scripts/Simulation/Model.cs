@@ -35,9 +35,10 @@ namespace MedievalTown.Simulation
         public int Graves;
         // Alehouse: cups sold today
         public int SoldToday;
-        // Taxes: what a household owes and hasn't yet handed to the reeve; the coin in the bailiff's chest
+        // Taxes: what a household owes and hasn't yet handed to the reeve; the coin in the steward's chest
         public float OwedGrain, OwedCoin, Arrears;
-        public float Coin;
+        public float Coin, ChestGrain;    // a tax chest: village cross, baron's manor, steward's hall
+        public int VillageId = -1;       // the village it belongs to
         public int Mask;                 // walls: which neighbours they join (1 north, 2 east, 4 south, 8 west; 16: the north one is a tower or gate)
 
         public BuildingDef Def { get { return Defs.Get(Type); } }
@@ -80,7 +81,6 @@ namespace MedievalTown.Simulation
         public float Loyalty = Balance.LoyaltyStart;   // to the lord of the manor
         public float Piety = 40f;
         public float Coin;
-        public int Mask;                 // walls: which neighbours they join (1 north, 2 east, 4 south, 8 west; 16: the north one is a tower or gate)
         public float Seed;               // 0..1, drives looks and small quirks
         public int ArrivedDay;
         public int MassDay = -999;       // last Sunday at mass
@@ -102,7 +102,8 @@ namespace MedievalTown.Simulation
         public float Rent = 1f;            // coin per freeman household per week, on top of the hearth tax
         public float Tallage = 1f;         // coin per serf household, assessed at Martinmas (start of winter)
         public float ReeveCut = 0.05f;     // the reeve's share of what he collects
-        public float BailiffCut = 0.1f;    // the bailiff's share of what he takes on to the castle
+        public float BaronCut = 0.15f;     // a baron's share of what his collector brings in
+        public float StewardCut = 0.1f;    // the steward's share of what he takes on to the castle
         public float Multure = 0.08f;      // the crown's share of every sack ground at the mill
         public float GrainPrice = 0.2f;    // what freemen pay for a measure of the king's grain
         public float FreeWage = 0.6f;      // a day's pay for freemen working for the crown
@@ -113,23 +114,56 @@ namespace MedievalTown.Simulation
         public float CoinReserve = 40f;    // coin the treasury won't spend on materials
     }
 
-    /// <summary>Where the taxes went: assessed on the households, collected by the reeve, taken on by the bailiff, received by the king.</summary>
+    /// <summary>Where the taxes went, stage by stage up the chain: households, reeves, barons, the steward, the king.</summary>
     [Serializable]
     public class TaxBook
     {
         public float AssessedCoin, AssessedGrain;          // what households were told they owe
-        public float CollectedCoin, CollectedGrain;        // what the reeve brought to the bailiff (after his cut)
         public float ReeveCutCoin, ReeveCutGrain;
-        public float BailiffCutCoin, BailiffCutGrain;
+        public float CollectedCoin, CollectedGrain;        // what reached the village chests
+        public float BaronCutCoin, BaronCutGrain;
+        public float StewardCutCoin, StewardCutGrain;
         public float ReceivedCoin, ReceivedGrain;          // what reached the castle
-        public float Unpaid;                               // coin households couldn't pay (still owed)
-        public void Clear() { AssessedCoin = AssessedGrain = CollectedCoin = CollectedGrain = ReeveCutCoin = ReeveCutGrain = BailiffCutCoin = BailiffCutGrain = ReceivedCoin = ReceivedGrain = Unpaid = 0; }
+        public float Withheld;                             // coin rebellious barons kept back
+        public float Unpaid;                               // coin households still owe
+        public void Clear() { AssessedCoin = AssessedGrain = ReeveCutCoin = ReeveCutGrain = CollectedCoin = CollectedGrain = BaronCutCoin = BaronCutGrain = StewardCutCoin = StewardCutGrain = ReceivedCoin = ReceivedGrain = Withheld = Unpaid = 0; }
         public void Add(TaxBook o)
         {
-            AssessedCoin += o.AssessedCoin; AssessedGrain += o.AssessedGrain; CollectedCoin += o.CollectedCoin; CollectedGrain += o.CollectedGrain;
-            ReeveCutCoin += o.ReeveCutCoin; ReeveCutGrain += o.ReeveCutGrain; BailiffCutCoin += o.BailiffCutCoin; BailiffCutGrain += o.BailiffCutGrain;
-            ReceivedCoin += o.ReceivedCoin; ReceivedGrain += o.ReceivedGrain; Unpaid += o.Unpaid;
+            AssessedCoin += o.AssessedCoin; AssessedGrain += o.AssessedGrain; ReeveCutCoin += o.ReeveCutCoin; ReeveCutGrain += o.ReeveCutGrain;
+            CollectedCoin += o.CollectedCoin; CollectedGrain += o.CollectedGrain; BaronCutCoin += o.BaronCutCoin; BaronCutGrain += o.BaronCutGrain;
+            StewardCutCoin += o.StewardCutCoin; StewardCutGrain += o.StewardCutGrain; ReceivedCoin += o.ReceivedCoin; ReceivedGrain += o.ReceivedGrain;
+            Withheld += o.Withheld; Unpaid += o.Unpaid;
         }
+    }
+
+    /// <summary>A village: its cross on the green, its reeve, and whom it pays its taxes to (a baron, or the crown directly).</summary>
+    [Serializable]
+    public class Village
+    {
+        public int Id;
+        public string Name;
+        public int CrossId = -1;           // the village cross; its chest holds the reeve's takings
+        public int ReeveId = -1;
+        public int BaronyId = -1;          // -1: the crown's own village
+        public bool Capital;
+        public int Founded;
+        public int GrumbleDay = -999;
+        public float LastCoin, LastGrain;  // what the reeve brought in last week
+    }
+
+    /// <summary>A barony: a baron in his manor, ruling some villages for the king, with his own tax collector.</summary>
+    [Serializable]
+    public class Barony
+    {
+        public int Id;
+        public int SeatVillageId = -1;     // the village the manor stands in
+        public int ManorId = -1;           // the manor; its chest holds what the collector brings in
+        public int BaronId = -1;
+        public int CollectorId = -1;
+        public float Loyalty = Balance.BaronStartLoyalty;   // to the crown
+        public bool Rebel;                 // withholding his taxes
+        public int BaronDue = -1;          // a new baron arrives on this day
+        public float LastCoin, LastGrain;  // what he sent on last week
     }
 
     /// <summary>The state of the realm: whether the village has risen.</summary>
@@ -139,8 +173,8 @@ namespace MedievalTown.Simulation
         public int LowDays;                // days in a row loyalty has been near nothing
         public bool Stripped;              // the village rose and deposed the king: game over
         public int SuitorDay = -1;         // a royal bride arrives on this day
-        public int BailiffDay = -1;        // a new bailiff arrives on this day
-        public int GrumbleDay = -999;      // the last time the villagers complained about the reeve
+        public int StewardDay = -1;        // a new steward arrives on this day
+        public int CollectorId = -1;       // the steward's man who rides out to the barons and the crown's villages
     }
 
     [Serializable]

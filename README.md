@@ -1,9 +1,10 @@
 # Medieval Town
 
 A medieval village in the same chunky 3/4 pixel-art style as Frontier Ledger. The king lives on the map, and the village is
-NPC-run around a **tax chain**: serfs → reeve → bailiff → king.
+NPC-run around a **realm** of villages and a **tax chain** that climbs it: serfs → reeve → baron → steward → king.
 
-You're the unseen hand: you lay out the village and set its laws, and the people live their lives.
+You're the unseen hand: you lay out the capital, found new villages around it, decide which of them get a baron, and set
+the laws. The people live their lives.
 
 ![The village in spring](docs/village-spring.png)
 
@@ -18,22 +19,41 @@ The simulation is new.
 3. The first time it opens, the project creates `Assets/Scenes/Main.unity` and opens it.
 4. Press **Play**. The game builds itself from code, so the scene stays empty in the editor.
 
-The manor saves once a week and when you quit, to `Application.persistentDataPath/medieval-town-save-v1.json`.
+The manor saves once a week and when you quit, to `Application.persistentDataPath/medieval-town-save-v1.json`. Saves from before the realm (v0.3) start a new reign.
 **Start a new manor** is at the bottom of the Manor Rules book.
 
 ## The start
 
 A new king comes to an old village of six serf families with their cottages and strips in the open field, two freemen
 and a track through the middle. There is no castle, no church and no mill. The royal family, a knight, a priest and the
-king's bailiff arrive with a pavilion and a baggage cart.
+king's steward arrive with a pavilion and a baggage cart.
 
 A sound opening:
 
 1. **Royal Granary**: the cart is unloaded into it.
 2. **Woodward's Lodge** and **Quarry**: freemen fell timber and break stone. Serfs on week-work help when sites wait.
 3. **Windmill**: everyone must grind at the king's mill and leave the crown's share. Bread goes further than pottage.
-4. **Bailiff's Hall**, the **Parish Church**, then the **Castle**, and finally **walls, towers and a gatehouse** around it.
+4. **Steward's Hall**, the **Parish Church**, then the **Castle**, and finally **walls, towers and a gatehouse** around it.
 5. More **Cottages** and **Strip Fields** as families grow. A family without a strip goes hungry.
+6. Branch out: a **Village Cross** founds a new village; a **Baron's Manor** in one of them raises a barony.
+
+## The realm
+
+The map is one big map. The capital (the village the king starts in) has its cross on the green from the start.
+
+- **Villages.** Build a **Village Cross** at least 20 tiles from any other village. Every home, strip and works within
+  14 tiles of a cross belongs to its village (22 for the capital). Each village chooses its own reeve each spring, and
+  newcomers settle in empty cottages anywhere. A house outside every village has no reeve: it pays no taxes, and an alert
+  says so.
+- **Baronies.** Build a **Baron's Manor** in any village except the capital. When it's finished a baron comes to live
+  there with his own tax collector, and the village becomes the seat of his barony. Villages you found within 45 tiles
+  of a manor fall to that baron. You can move a village between the crown and a barony from its cross.
+- **Barons** have a hidden honesty and a loyalty to the crown. It drifts with their share (the Laws), the harvest tax
+  and the king's temperament. Below 20 a baron refuses to send his taxes (they show as withheld) until it climbs back
+  over 35. You can **strip his title**: what's in his chest goes to the crown and a new baron arrives within a week,
+  but every other baron loses 15 loyalty.
+
+![The village cross, a baron's manor, the steward's hall and a cottage](docs/realm.png)
 
 ## The tax chain
 
@@ -45,16 +65,18 @@ Each household owes:
 
 | Day | Who | What happens |
 |---|---|---|
-| Friday | **Reeve** | Walks door to door with a sack and collects what each house owes. Coin they can't pay he takes in grain. He keeps his share (5%) and carries the rest to the Bailiff's Hall. |
-| Saturday | **Bailiff** | Carries the tax chest from his hall to the castle and keeps his share (10%). |
-| Saturday | **King** | The rest reaches the royal treasury and granary. |
+| Friday | **Reeve** (one per village) | Walks door to door with a sack and collects what each house owes. Coin they can't pay he takes in grain. He keeps his share (5%) and puts the rest in the chest at the village cross. |
+| Saturday | **Baron's collector** | Rides round the baron's villages and brings their chests to the manor. The baron keeps his share (15%). |
+| Monday | **Steward's collector** | Rides to every manor and every crown village and brings it all to the Steward's Hall. A rebel baron sends him away. Until there's more than one village there's no collector, and the capital's chest is fetched directly. |
+| Tuesday | **Steward** | Carries the tax chest to the castle and keeps his share (10%). The rest reaches the royal treasury and granary. |
 
 Every officer has a hidden **honesty**:
 
 - **A crooked reeve** squeezes households for more than they owe and pockets it. The village grumbles about him in the
   Chronicle and their loyalty drops. The villagers choose a reeve each spring and prefer honest men, but they can get it
   wrong. You can order them to choose another.
-- **A crooked bailiff** keeps more of the chest than his share. It shows in the Court book's tax ledger and in the
+- **A crooked baron** keeps more than his share. Rumours reach the court at Michaelmas.
+- **A crooked steward** keeps more of the chest than his share. It shows in the Court book's tax ledger and in the
   Michaelmas accounts. You can dismiss him, and a new one is sent within a week.
 
 The shares, taxes and week-work are all set in **the Laws**. If loyalty stays near nothing for two weeks, the village
@@ -66,9 +88,11 @@ rises and drives the king out, and that reign is over.
 |---|---|
 | **King** | Holds court in the castle (a pavilion until it's built). Eats from the grain taxes and the mill's share, and buys grain at market when the granary runs short. Has a temperament (Just, Pious, Greedy, Cruel, Brave, Gentle) that shapes the village. Ages and dies. The eldest son inherits, then a daughter, then kin. A child heir rules through a regent. With no heir, a claimant from another house takes the throne. An unwed king is found a match with a dowry. |
 | **Knight** | Rides the village by day. Families are less likely to flee. |
-| **Bailiff** | The king's man. Lives in the Bailiff's Hall, keeps the tax chest and carries it to the castle. |
+| **Steward** | The king's man. Lives in the Steward's Hall, keeps the crown's tax chest and carries it to the castle. |
+| **Baron** | Rules a barony from his manor for the king. Keeps a share of his villages' taxes and sends the rest on, unless he rebels. |
+| **Collector** | Each baron has one, and so does the steward once there are other villages. Rides out to empty the chests. |
 | **Priest** | Says mass on Sundays and takes a tenth of every harvest as tithe. Gives alms from it to the hungry. |
-| **Reeve** | A serf chosen by the villagers each spring. Collects the taxes, and while he's in office the strips are worked 10% better. |
+| **Reeve** | A serf chosen by each village every spring. Collects its taxes, and while he's in office its strips are worked 10% better. |
 | **Freemen** | Work the trades (mill, woods, quarry, alehouse) for the crown's wage. Pay rent, and buy grain and firewood from the granary. |
 | **Serfs** | Owe the king week-work: 2 days a week by custom, on his building sites, carting stone and timber, and gathering his wood. When there's nothing to do they go back to their own strips, which they work the rest of the week. Sunday is for mass. |
 
@@ -95,7 +119,9 @@ the new reeve.
 | Parish Church | Church | 3×4 | 20 / 50 | 30 |
 | Castle | Crown | 7×6 | 40 / 120 | 60 |
 | Royal Granary | Crown | 3×2 | 24 / 6 | 10 |
-| Bailiff's Hall | Crown | 3×2 | 16 / 18 | 12 |
+| Steward's Hall | Crown | 3×2 | 16 / 18 | 12 |
+| Village Cross | Realm | 2×2 | 2 / 6 | 3 |
+| Baron's Manor | Realm | 4×3 | 30 / 40 | 30 |
 | Castle Wall | Crown | 1×1 (drag to paint) | 0 / 3 | 1 per tile |
 | Wall Tower | Crown | 2×2 | 4 / 20 | 8 |
 | Gatehouse | Crown | 3×2 | 8 / 30 | 14 |
@@ -116,14 +142,16 @@ the gatehouse.
 | Recenter | `H` |
 | Pause / speeds | `Space`, `1`–`4` (1×, 3×, 10×, 30×). A day lasts 3 minutes at 1×. |
 | Tools | `Q` inspect, `R` track, `X` clear trees and rocks, `Esc` or right-click to cancel |
-| Build | Hotbar at the bottom: Tracks, Homes, Fields, Works, Church, Crown |
+| Build | Hotbar at the bottom: Tracks, Homes, Fields, Works, Church, Crown, Realm. The placement tooltip says which village a building will belong to. |
 | Inspect | Click a villager or building. Click names in the books to find people on the map. |
 
 The four books at the top right:
 
-- **The Court:** the royal family, the knights, the reeve and bailiff, with buttons to call a new reeve or dismiss
-  the bailiff. Also the tax ledger (owed → reeve kept → bailiff kept → reached the castle), the church and the village.
-- **The Laws:** harvest tax, hearth tax, tallage, the reeve's and bailiff's shares, week-work, multure, freemen's rent
+- **The Court:** the royal family, the knights, the steward and his collector, then **the realm**: every barony
+  (baron, loyalty, what he sent on, a strip-his-title button) with its villages, and the crown's own villages, each
+  with its reeve and a new-reeve button. Click a village to go to its cross. Also the tax ledger (owed → reeves kept →
+  barons kept → steward kept → reached the castle, plus anything rebels withheld), the church and the village.
+- **The Laws:** harvest tax, hearth tax, tallage, the reeves', barons' and steward's shares, week-work, multure, freemen's rent
   and wages, the grain price, the granary reserve, selling surplus, buying materials and the dole.
 - **Folk:** everyone, sortable by rank, loyalty, name or age.
 - **The Chronicle:** everything that's happened.
@@ -134,7 +162,8 @@ The four books at the top right:
   - `Town.cs`: the map, placing and removing buildings, stores, a new manor.
   - `Town.Day.cs`: the daily plan and the day.
   - `Town.People.cs`: households, housing, strips, trades, births, deaths, marriages, flight, newcomers.
-  - `Town.Court.cs`: succession, the reeve and bailiff, the tax chain, Michaelmas accounts, feast days, revolt.
+  - `Town.Realm.cs`: villages, baronies, reeves, the steward, the tax chain, Michaelmas accounts.
+  - `Town.Court.cs`: succession, marriages, feast days, the priest, revolt.
   - `Defs.cs`: buildings, ranks, names and every balance number.
 - `Assets/Scripts/Game`: Unity side: `GameController` (clock, input, save), `WorldView` (the map), `Hud`
   (the interface), and `Art/` (all the procedural pixel art, with medieval buildings in `BuildingArt.Medieval.cs`).

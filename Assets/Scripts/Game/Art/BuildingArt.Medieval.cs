@@ -670,9 +670,9 @@ namespace MedievalTown.Game.Art
             k.M.PileAt = new Vector2Int(-1, -1);
         }
 
-        /// <summary>The bailiff's hall: a stone ground floor where the tax chest is kept behind an iron-bound door, a timber-framed
+        /// <summary>The steward's hall: a stone ground floor where the tax chest is kept behind an iron-bound door, a timber-framed
         /// upper floor where he lives, and the king's arms over the door.</summary>
-        static void BailiffHall(Ctx k)
+        static void StewardHall(Ctx k)
         {
             var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
             bg.R(0, y0 + 26, 48, 6, W ? "#d8d2c6" : "#b8996a");
@@ -704,6 +704,70 @@ namespace MedievalTown.Game.Art
             Foundation(tg, 4, y0 + 28, 40);
             // a bench where the reeve waits, and a tally stick rack
             tg.R(31, y0 + 26, 8, 1, "#a8784a"); tg.R(32, y0 + 27, 1, 2, "#7a4e2c"); tg.R(38, y0 + 27, 1, 2, "#7a4e2c");
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>The village cross: a stone cross on a stepped base on the green, with the village well beside it.
+        /// The reeve's takings are kept in an iron-bound chest at its foot.</summary>
+        static void VillageCross(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            // the trodden green
+            bg.Ellipse(16, y0 + 20, 15, 10, PixelCanvas.C(W ? "#e4e0d8" : "#8aa85a"));
+            bg.Ellipse(16, y0 + 22, 11, 6, PixelCanvas.C(W ? "#d8d2c6" : "#b8996a"));
+            Shadow(tg, 6, y0 + 26, 16);
+            // three steps
+            Stone(tg, 6, y0 + 22, 16, 5, StoneWarm);
+            Stone(tg, 8, y0 + 18, 12, 4, StoneWarm);
+            Stone(tg, 10, y0 + 15, 8, 3, StoneWarm);
+            tg.R(6, y0 + 22, 16, 1, StoneWarm[2]); tg.R(8, y0 + 18, 12, 1, StoneWarm[2]); tg.R(10, y0 + 15, 8, 1, StoneWarm[2]);
+            // the shaft and the head of the cross
+            tg.R(13, y0 - 12, 3, 27, StoneWarm[0]); tg.R(15, y0 - 12, 1, 27, StoneWarm[3]); tg.R(13, y0 - 12, 1, 27, StoneWarm[2]);
+            tg.R(9, y0 - 8, 11, 3, StoneWarm[0]); tg.R(9, y0 - 8, 11, 1, StoneWarm[2]); tg.R(9, y0 - 6, 11, 1, StoneWarm[3]);
+            tg.R(12, y0 - 14, 5, 2, StoneWarm[0]); tg.R(12, y0 - 14, 5, 1, StoneWarm[2]);
+            // lichen
+            tg.D(14, y0 + 2, "#8a9a5a"); tg.D(13, y0 + 9, "#8a9a5a"); tg.D(10, y0 - 7, "#8a9a5a");
+            // the tax chest at the foot of the steps
+            tg.R(17, y0 + 24, 6, 4, "#6e4428"); tg.R(17, y0 + 24, 6, 1, "#8a5a34"); tg.R(17, y0 + 26, 6, 1, "#3a3a3a"); tg.D(20, y0 + 25, "#e0b04a");
+            // the well
+            tg.R(23, y0 + 21, 9, 5, StoneC[0]); tg.R(23, y0 + 21, 9, 1, StoneC[2]); tg.R(24, y0 + 20, 7, 2, "#2a3a4a"); tg.R(23, y0 + 20, 9, 1, StoneC[2]);
+            for (int x = 24; x < 32; x += 3) tg.D(x, y0 + 23, StoneC[3]);
+            tg.R(23, y0 + 12, 1, 9, TIMBERMID); tg.R(31, y0 + 12, 1, 9, TIMBERMID);
+            for (int r = 0; r < 4; r++) tg.R(27 - r - 1, y0 + 8 + r, 2 * r + 3, 1, W ? "#efece6" : r == 3 ? TIMBERDARK : TIMBERMID);
+            tg.R(23, y0 + 14, 9, 1, "#7a5a3a"); tg.R(27, y0 + 15, 1, 4, "#a8784a"); tg.R(26, y0 + 18, 3, 2, "#7a5a3a");
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A baron's manor: a stone hall under red tiles with a squat tower and his banner, and a timber wing for the household.</summary>
+        static void Manor(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            const string BANNER = "#7a3a4a";
+            bg.R(0, y0 + 40, 64, 8, W ? "#d8d2c6" : "#b8996a");
+            for (int x = 24; x < 40; x += 4) { bg.R(x, y0 + 41, 3, 2, StoneC[0]); bg.R(x + 2, y0 + 44, 3, 2, StoneC[0]); }
+            Shadow(tg, 2, y0 + 43, 60);
+            // the timber wing on the right
+            Thatch(tg, 40, y0 - 2, 22, 16, W, ThatchC);
+            Daub(tg, 41, y0 + 14, 20, 26, Daubs[1]);
+            Window(k, 45, y0 + 20, 4, 4, false, TIMBERMID); Window(k, 54, y0 + 20, 4, 4, false, TIMBERMID);
+            Shutter(k, 50, y0 + 30, 4, 5);
+            Foundation(tg, 41, y0 + 39, 20);
+            // the stone hall
+            Shingles(tg, 6, y0 - 14, 38, 18, Tiles, W);
+            Chimney(k, 32, y0 - 20, 9);
+            Stone(tg, 8, y0 + 4, 34, 37, StoneWarm);
+            Lancet(k, 13, y0 + 10, 4, 9, false); Lancet(k, 33, y0 + 10, 4, 9, false);
+            ArchDoor(k, 22, y0 + 26, 7, 14, "#5a3a22", StoneWarm[2]);
+            tg.R(21, y0 + 20, 9, 5, BANNER); tg.R(23, y0 + 21, 5, 3, "#e0b04a"); tg.R(24, y0 + 22, 3, 1, BANNER);   // his arms over the door
+            Foundation(tg, 8, y0 + 40, 34);
+            // the squat tower at the left end
+            Stone(tg, 0, y0 - 6, 12, 46, StoneC);
+            Merlons(tg, 0, y0 - 10, 12, StoneC, W);
+            tg.R(5, y0 + 4, 2, 5, "#2a1a10"); tg.R(5, y0 + 18, 2, 5, "#2a1a10");
+            k.Wins.Add(new RectInt(5, y0 + 18, 2, 5));
+            // the banner on the tower
+            tg.R(6, y0 - 26, 1, 16, "#5a4a3a");
+            tg.R(7, y0 - 25, 8, 6, BANNER); tg.R(7, y0 - 25, 8, 1, "#9a4a5a"); tg.D(14, y0 - 19, BANNER); tg.D(9, y0 - 23, "#e0b04a"); tg.D(10, y0 - 23, "#e0b04a");
             k.M.PileAt = new Vector2Int(-1, -1);
         }
 

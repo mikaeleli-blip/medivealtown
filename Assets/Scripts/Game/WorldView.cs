@@ -230,7 +230,7 @@ namespace MedievalTown.Game
             switch (b.Type)
             {
                 case BuildingType.Cottage: case BuildingType.FreeHouse: return b.Residents.Count > 0;
-                case BuildingType.Keep: case BuildingType.Pavilion: case BuildingType.BailiffHall: return b.Residents.Count > 0;
+                case BuildingType.Keep: case BuildingType.Pavilion: case BuildingType.StewardHall: case BuildingType.Manor: return b.Residents.Count > 0;
                 case BuildingType.Church: return town.Priest != null && (t > 0.78f || town.IsSunday);
                 case BuildingType.Alehouse: return b.Employees.Count > 0 && !town.IsSunday && (t > 0.68f || t < 0.1f);
                 case BuildingType.Mill: return b.Employees.Count > 0 && t > 0.75f && t < 0.86f;
@@ -624,13 +624,32 @@ namespace MedievalTown.Game
                     break;
                 case Chore.Collect:
                 {
-                    // door to door through the day, then on to the bailiff with the takings
-                    var houses = town.Buildings.Where(b => b.Built && Town.IsPeasantHome(b.Type) && b.Residents.Count > 0).OrderBy(b => b.X).ThenBy(b => b.Y).ToList();
                     float k = Mathf.Clamp01((ph - 0.28f) / 0.38f);
-                    if (houses.Count == 0 || k >= 1f) { if (t != null) { j.Inside = true; j.B = t; } return j; }
+                    if (p.Rank == Rank.Collector)
+                    {
+                        // riding round the village crosses (and, for the steward's man, the manors), then home with the chest
+                        List<Building> stops;
+                        var bar = town.BaronyOfBaron(p);
+                        if (bar != null) stops = town.VillagesOf(bar).Select(town.CrossOf).Where(c => c != null).ToList();
+                        else
+                        {
+                            stops = town.Villages.Where(v => v.BaronyId < 0).Select(town.CrossOf).Where(c => c != null).ToList();
+                            stops.AddRange(town.Baronies.Select(x => town.GetBuilding(x.ManorId)).Where(m => m != null));
+                        }
+                        stops = stops.OrderBy(b => b.X).ToList();
+                        if (stops.Count == 0 || k >= 1f) { if (t != null) { j.Inside = true; j.B = t; } return j; }
+                        var st = stops[Mathf.Min(stops.Count - 1, Mathf.FloorToInt(k * stops.Count))];
+                        j.B = st; j.Spot = HasDoor(st) ? DoorStep(st, p) + new Vector2(4, 2) : Front(st, p); j.Dir = PeopleArt.Up;
+                        j.Carry = PropArt.Chest();
+                        return j;
+                    }
+                    // the reeve: door to door round his village, then the takings into the chest at the cross
+                    int vid = t != null ? t.VillageId : -1;
+                    var houses = town.Buildings.Where(b => b.Built && Town.IsPeasantHome(b.Type) && b.Residents.Count > 0 && b.VillageId == vid).OrderBy(b => b.X).ThenBy(b => b.Y).ToList();
+                    j.Carry = PropArt.CarriedSack();
+                    if (houses.Count == 0 || k >= 1f) { if (t != null) { j.B = t; j.Spot = Front(t, p); j.Dir = PeopleArt.Up; } return j; }
                     var h = houses[Mathf.Min(houses.Count - 1, Mathf.FloorToInt(k * houses.Count))];
                     j.B = h; j.Spot = HasDoor(h) ? DoorStep(h, p) + new Vector2(4, 2) : Front(h, p); j.Dir = PeopleArt.Up;
-                    j.Carry = PropArt.CarriedSack();
                     return j;
                 }
                 case Chore.Deliver:

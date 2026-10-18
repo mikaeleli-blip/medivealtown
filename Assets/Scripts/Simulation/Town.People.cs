@@ -16,12 +16,12 @@ namespace MedievalTown.Simulation
             for (int guard = 0; guard < 6 && p != null; guard++)
             {
                 if (RoyalHousehold(p)) return RoyalKey;
-                if (p.Rank == Rank.Priest || p.Rank == Rank.Bailiff) return p.Id;
+                if (IsOfficer(p)) return p.Id;
                 var partner = GetCitizen(p.PartnerId);
                 if (partner != null) return p.Female ? partner.Id : p.Id;
                 // unmarried: with a parent if there is one in the village
                 var parent = GetCitizen(p.MotherId) ?? GetCitizen(p.FatherId);
-                if (parent != null && !RoyalHousehold(parent) && parent.Rank != Rank.Priest && parent.Rank != Rank.Bailiff && (p.IsChild || p.Age < 24)) { p = parent; continue; }
+                if (parent != null && !RoyalHousehold(parent) && !IsOfficer(parent) && (p.IsChild || p.Age < 24)) { p = parent; continue; }
                 return p.Id;
             }
             return p != null ? p.Id : -1;
@@ -63,13 +63,21 @@ namespace MedievalTown.Simulation
             var church = Church;
             foreach (var p in People.Where(p => p.Rank == Rank.Priest)) p.HomeId = church != null ? church.Id : seat != null ? seat.Id : -1;
             if (church != null) taken.Add(church.Id);
-            // the bailiff lives at his hall, or with the court until it's built
-            var hall = BailiffHall;
-            foreach (var p in People.Where(p => p.Rank == Rank.Bailiff)) p.HomeId = hall != null ? hall.Id : seat != null ? seat.Id : -1;
+            // the steward lives at his hall, or with the court until it's built
+            var hall = StewardHall;
+            foreach (var p in People.Where(p => p.Rank == Rank.Steward)) p.HomeId = hall != null ? hall.Id : seat != null ? seat.Id : -1;
             if (hall != null) taken.Add(hall.Id);
+            var crownCol = GetCitizen(Crown.CollectorId);
+            if (crownCol != null) crownCol.HomeId = hall != null ? hall.Id : seat != null ? seat.Id : -1;
+            // each baron and his collector at the manor
+            foreach (var bar in Baronies)
+            {
+                var manor = GetBuilding(bar.ManorId);
+                foreach (var id in new[] { bar.BaronId, bar.CollectorId }) { var o = GetCitizen(id); if (o != null) o.HomeId = manor != null ? manor.Id : -1; }
+            }
 
             // families keep their house if it suits them; the head's house wins when two families claim one
-            var families = units.Where(kv => kv.Key != RoyalKey && !kv.Value.Any(p => p.Rank == Rank.Priest || p.Rank == Rank.Bailiff)).ToList();
+            var families = units.Where(kv => kv.Key != RoyalKey && !kv.Value.Any(IsOfficer)).ToList();
             var homeless = new List<KeyValuePair<int, List<Citizen>>>();
             foreach (var kv in families.OrderByDescending(kv => kv.Value.Count(p => !p.IsChild && p.PartnerId >= 0)).ThenByDescending(kv => kv.Value.Count))
             {
@@ -86,8 +94,9 @@ namespace MedievalTown.Simulation
             foreach (var kv in homeless)
             {
                 var head = GetCitizen(kv.Key) ?? kv.Value[0];
+                var was = GetBuilding(head.HomeId); int vid = was != null ? was.VillageId : -1;
                 var free = Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && !taken.Contains(b.Id) && Suits(b, head))
-                                    .OrderBy(b => head.Rank == Rank.Freeman ? (b.Type == BuildingType.FreeHouse ? 0 : 1) : (b.Type == BuildingType.Cottage ? 0 : 1))
+                                    .OrderBy(b => b.VillageId == vid ? 0 : 1).ThenBy(b => head.Rank == Rank.Freeman ? (b.Type == BuildingType.FreeHouse ? 0 : 1) : (b.Type == BuildingType.Cottage ? 0 : 1))
                                     .FirstOrDefault();
                 if (free != null) { taken.Add(free.Id); foreach (var m in kv.Value) m.HomeId = free.Id; }
                 else foreach (var m in kv.Value) m.HomeId = -1;
@@ -124,10 +133,19 @@ namespace MedievalTown.Simulation
             var dupes = strips.Where(s => s.HolderId >= 0).GroupBy(s => s.HolderId).Where(g => g.Count() > 1).SelectMany(g => g.Skip(1)).ToList();
             foreach (var s in dupes) s.HolderId = -1;
             var without = heads.Where(h => !holding.Contains(h)).ToList();
+            // a family takes a strip in its own village, or else the nearest one going
             foreach (var s in strips.Where(s => s.HolderId < 0))
             {
                 if (without.Count == 0) break;
-                s.HolderId = without[0]; without.RemoveAt(0);
+                int pick = -1, best = int.MaxValue;
+                foreach (var id in without)
+                {
+                    var home = HomeOf(GetCitizen(id)); if (home == null) continue;
+                    int dx = home.X - s.X, dy = home.Y - s.Y, d = dx * dx + dy * dy + (home.VillageId == s.VillageId && s.VillageId >= 0 ? 0 : 100000);
+                    if (d < best) { best = d; pick = id; }
+                }
+                if (pick < 0) pick = without[0];
+                s.HolderId = pick; without.Remove(pick);
             }
         }
 
@@ -243,9 +261,15 @@ namespace MedievalTown.Simulation
             People.Remove(p);
             if (p.Id == KingId) Succession(p);
             if (p.Id == RegentId) RegentId = -1;
-            if (p.Id == ReeveId) { ReeveId = -1; ChooseReeve(true); }
             if (p.Id == PriestId) PriestDied();
-            if (p.Id == BailiffId) { BailiffId = -1; Crown.BailiffDay = Day + Balance.BailiffArrives; AddLog("A new bailiff has been sent for.", LogKind.Crown); }
+            if (p.Rank == Rank.Reeve) ReeveVacancies(false);
+            if (p.Id == Crown.CollectorId) Crown.CollectorId = -1;
+            foreach (var bar in Baronies)
+            {
+                if (bar.CollectorId == p.Id) bar.CollectorId = -1;
+                if (bar.BaronId == p.Id) { bar.BaronId = -1; bar.BaronDue = Day + Balance.StewardArrives; bar.Rebel = false; AddLog("The crown will send a new baron to " + (GetVillage(bar.SeatVillageId) != null ? GetVillage(bar.SeatVillageId).Name : "the barony") + ".", LogKind.Crown); }
+            }
+            if (p.Id == StewardId) { StewardId = -1; Crown.StewardDay = Day + Balance.StewardArrives; AddLog("A new steward has been sent for.", LogKind.Crown); }
             Rehouse(); AssignStrips(); Hire();
         }
 
@@ -256,12 +280,11 @@ namespace MedievalTown.Simulation
             AddLog("The " + h.Family + " family fled in the night" + (family.Any(p => p.Rank == Rank.Serf) ? " rather than stay bound to the land." : "."), LogKind.Bad);
             foreach (var p in family)
             {
-                if (p.Id == ReeveId) ReeveId = -1;
                 var partner = GetCitizen(p.PartnerId); if (partner != null && !family.Contains(partner)) partner.PartnerId = -1;
                 People.Remove(p); Fled++;
             }
             Rehouse(); AssignStrips(); Hire();
-            if (ReeveId < 0) ChooseReeve(true);
+            ReeveVacancies(false);
         }
 
         /// <summary>Folk come to the manor: a serf family seeking a lord's protection when a cottage stands empty,
@@ -284,11 +307,13 @@ namespace MedievalTown.Simulation
             int n = Rng.Next(0, 3);
             for (int k = 0; k < n; k++) Child(mom, dad, Rnd(0.5f, 10));
             Arrived += 2 + n;
-            var home = rank == Rank.Freeman ? (freeHouse ?? empty[0]) : empty.First(b => b.Type == BuildingType.Cottage);
-            home.Stock[(int)Good.Grain] += 30;
+            var home = rank == Rank.Freeman ? (freeHouse ?? empty[0]) : empty.OrderBy(b => Rng.Next()).First(b => b.Type == BuildingType.Cottage);
+            var hv = VillageOf(home);
+            // they bring enough to see them to their first harvest, roughly
+            home.Stock[(int)Good.Grain] += Math.Max(30, (2 + n * 0.6f) * Math.Min(DaysUntilHarvest, 50) * 0.6f / Balance.GrainFeeds);
             foreach (var p in People.Where(p => p.Family == fam && p.HomeId < 0 && p.ArrivedDay == Day)) { p.HomeId = home.Id; p.Loyalty = 60; }
             AddLog(rank == Rank.Freeman ? "A freeman, " + dad.Name + ", came with his family looking for work and took the empty house."
-                                        : dad.Name + " and his family came to " + ManorName + " seeking the king's protection, and swore to serve the crown as villeins.", LogKind.Good);
+                                        : dad.Name + " and his family came to " + (hv != null ? hv.Name : ManorName) + " seeking the king's protection, and swore to serve the crown as villeins.", LogKind.Good);
             Rehouse(); AssignStrips(); Hire();
         }
 
@@ -308,8 +333,10 @@ namespace MedievalTown.Simulation
                 if (p.Female) return (consort ? "Queen " : born ? "Princess " : "Queen dowager ") + p.First;
                 return (consort ? "Prince consort " : "Prince ") + p.First;
             }
-            if (p.Rank == Rank.Bailiff) return "Bailiff " + p.First + " " + p.Family;
-            if (p.Id == ReeveId) return p.Name + " the reeve";
+            if (p.Rank == Rank.Steward) return "Steward " + p.First + " " + p.Family;
+            if (p.Rank == Rank.Baron) { var bar = BaronyOfBaron(p); var sv = bar != null ? GetVillage(bar.SeatVillageId) : null; return (p.Female ? "Baroness " : "Baron ") + p.First + (sv != null ? " of " + sv.Name : " " + p.Family); }
+            if (p.Rank == Rank.Collector) return p.Name + " the collector";
+            if (p.Rank == Rank.Reeve) return p.Name + " the reeve";
             return p.Name;
         }
     }

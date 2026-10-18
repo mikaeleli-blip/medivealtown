@@ -11,7 +11,7 @@ namespace MedievalTown.Simulation
     [Serializable]
     public partial class Town
     {
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
         public int Version = CurrentVersion;
         public int Seed;
         public int Day = 1;
@@ -26,8 +26,11 @@ namespace MedievalTown.Simulation
         public List<Citizen> People = new List<Citizen>();
         public List<LogEntry> Log = new List<LogEntry>();
         public List<HistoryPoint> History = new List<HistoryPoint>();
+        public List<Village> Villages = new List<Village>();
+        public List<Barony> Baronies = new List<Barony>();
+        public int NextRealmId = 1;
 
-        public int KingId = -1, RegentId = -1, ReeveId = -1, PriestId = -1, BailiffId = -1;
+        public int KingId = -1, RegentId = -1, PriestId = -1, StewardId = -1;
         public int Generation = 1;               // monarchs of this house so far
         public TaxBook Taxes = new TaxBook(), LastTaxes = new TaxBook();   // this year's and last year's
         public float WeekTaxCoin, WeekTaxGrain, LastTaxCoin, LastTaxGrain;   // taxes received this week and last
@@ -58,6 +61,8 @@ namespace MedievalTown.Simulation
             if (Policy == null) Policy = new ManorPolicy();
             if (Crown == null) Crown = new Crown();
             if (History == null) History = new List<HistoryPoint>();
+            if (Villages == null) Villages = new List<Village>();
+            if (Baronies == null) Baronies = new List<Barony>();
             foreach (var b in Buildings)
             {
                 b.Stock = Fit(b.Stock); b.Delivered = Fit(b.Delivered);
@@ -92,6 +97,7 @@ namespace MedievalTown.Simulation
         public bool IsSunday { get { return WeekdayIndex == 6; } }
         public bool IsMarketDay { get { return WeekdayIndex == 5; } }
         public string DateLabel { get { return Defs.Seasons[Season] + " " + DayOfSeason + ", " + Year; } }
+        public string DateOf(int day) { int y = Balance.StartYear + (day - 1) / Balance.DaysPerYear, s = SeasonOf(day), doy = (day - 1) % Balance.DaysPerYear; return Defs.Seasons[s] + " " + (doy - Balance.SeasonStart(s) + 1) + ", " + y; }
         public float SeasonProgress { get { return (DayOfSeason - 1 + TimeOfDay) / DaysInSeason; } }
         /// <summary>0 in daylight, rising to 1 at the darkest point of night.</summary>
         public float Nightness
@@ -130,7 +136,6 @@ namespace MedievalTown.Simulation
         public Building Seat { get { return Keep ?? Pavilion; } }    // where the king holds court
         public Citizen King { get { return GetCitizen(KingId); } }
         public Citizen Regent { get { return GetCitizen(RegentId); } }
-        public Citizen Reeve { get { return GetCitizen(ReeveId); } }
         public Citizen Priest { get { return GetCitizen(PriestId); } }
         /// <summary>Whoever actually rules: the king, or the regent while he's a child.</summary>
         public Citizen Ruler { get { var l = King; if (l != null && l.IsChild && Regent != null) return Regent; return l; } }
@@ -146,7 +151,7 @@ namespace MedievalTown.Simulation
         {
             get
             {
-                var l = People.Where(p => !p.IsChild && !RoyalHousehold(p) && p.Rank != Rank.Priest && p.Rank != Rank.Bailiff).ToList();
+                var l = People.Where(p => !p.IsChild && !RoyalHousehold(p) && !IsOfficer(p)).ToList();
                 return l.Count == 0 ? 50f : l.Average(p => p.Loyalty);
             }
         }
@@ -282,6 +287,7 @@ namespace MedievalTown.Simulation
                     if (t == Tile.Water && type != BuildingType.Road) return "Only a track can ford the water";
                 }
             if (d.Unique && Buildings.Any(b => b.Type == type)) return "There's already a " + d.Name;
+            var realm = RealmCheck(type, x, y); if (realm != null) return realm;
             if (d.NeedsStone && !NearStone(x, y, d.W, d.H, d.Radius)) return "A quarry needs a hillside next to it or boulders nearby";
             return null;
         }
@@ -303,6 +309,7 @@ namespace MedievalTown.Simulation
             var b = new Building { Id = NextId++, Type = type, X = x, Y = y, BuiltDay = Day, Built = free || d.Instant };
             if (b.Built) { b.Progress = d.Work; b.Delivered[(int)Good.Timber] = d.Timber; b.Delivered[(int)Good.Stone] = d.Stone; }
             Buildings.Add(b);
+            AssignVillage(b);
             MarkDirty(b);
             if (d.IsWall) RemaskWalls(b);
             if (b.Built) OnBuilt(b, free);
@@ -362,6 +369,12 @@ namespace MedievalTown.Simulation
                     AddLog((r != null ? Title(r) : "The king") + " moved the court into the castle. The treasury is kept in the great hall now.", LogKind.Crown);
                     foreach (var p in People) if (!RoyalHousehold(p)) p.Loyalty = Clamp(p.Loyalty + 3, 0, 100);
                     break;
+                case BuildingType.VillageCross:
+                    FoundVillage(b, false);
+                    break;
+                case BuildingType.Manor:
+                    RaiseBarony(b);
+                    break;
                 case BuildingType.Church:
                     AddLog("The bishop consecrated " + ChurchName + ". There will be mass on Sundays.", LogKind.Church);
                     break;
@@ -379,6 +392,9 @@ namespace MedievalTown.Simulation
                 if (p.WorkId == b.Id) p.WorkId = -1;
                 if (p.TaskId == b.Id) { p.TaskId = -1; p.Chore = Chore.Rest; }
             }
+            if (b.Type == BuildingType.VillageCross) VillageLost(b);
+            if (b.Type == BuildingType.Manor) foreach (var bar in Baronies.Where(x => x.ManorId == b.Id).ToList()) EndBarony(bar, "lost its manor");
+            if (b.Coin > 0 || b.ChestGrain > 0) { Receive(b.Coin, b.ChestGrain); b.Coin = 0; b.ChestGrain = 0; }
             Buildings.Remove(b);
             MarkDirty(b);
             if (d.IsWall) RemaskWalls(b);
@@ -445,6 +461,11 @@ namespace MedievalTown.Simulation
                 t.Place(BuildingType.Road, x, TrailRow, out err, true);
             }
 
+            // the village cross on the green: the capital
+            for (int dx = 0; dx < 2; dx++) for (int dy = 1; dy < 3; dy++) t.Terrain[(TrailRow + dy) * Cols + VillageX + 17 + dx] = Tile.Grass;
+            var cross = t.Place(BuildingType.VillageCross, VillageX + 17, TrailRow + 1, out err, true);
+            t.FoundVillage(cross, true, t.ManorName);
+
             // the royal household arrives with a pavilion and a cart
             var pav = t.Place(BuildingType.Pavilion, VillageX + 8, TrailRow - 8, out err, true);
             var cart = t.Place(BuildingType.Cart, VillageX + 11, TrailRow - 8, out err, true);
@@ -463,9 +484,9 @@ namespace MedievalTown.Simulation
             knight.Loyalty = 75;
             var priest = t.AddPerson(false, t.Pick(Defs.PeasantNames), t.Rnd(30, 50), Rank.Priest);
             priest.Piety = 90; t.PriestId = priest.Id;
-            var bailiff = t.AddPerson(false, t.Pick(Defs.KnightNames), t.Rnd(30, 48), Rank.Bailiff);
-            bailiff.Honesty = (float)Math.Round(t.Rnd(0.3f, 1f), 2); bailiff.Loyalty = 70; bailiff.Coin = 5; t.BailiffId = bailiff.Id;
-            foreach (var p in new[] { lord, lady, knight, priest, bailiff }) p.HomeId = pav.Id;
+            var steward = t.AddPerson(false, t.Pick(Defs.KnightNames), t.Rnd(30, 48), Rank.Steward);
+            steward.Honesty = (float)Math.Round(t.Rnd(0.3f, 1f), 2); steward.Loyalty = 70; steward.Coin = 5; t.StewardId = steward.Id;
+            foreach (var p in new[] { lord, lady, knight, priest, steward }) p.HomeId = pav.Id;
 
             // the village: six serf families with their cottages and strips, and two freemen
             for (int i = 0; i < 6; i++)
@@ -506,8 +527,8 @@ namespace MedievalTown.Simulation
             t.Log.Clear();
             t.AddLog(t.Title(lord) + " of the house of " + t.Dynasty + " has come to " + t.ManorName + " to make it the seat of his kingdom.", LogKind.Crown);
             t.AddLog("The village has six serf families, two freemen and an old track. There is no keep, no church and no mill.", LogKind.Info);
-            t.AddLog("Taxes climb the chain: every Friday the reeve collects from each household and carries it to " + t.Title(bailiff) + ", the king's bailiff, who brings it to the king on Saturday. Each keeps a share.", LogKind.Crown);
-            t.AddLog("Serfs owe the king " + t.Policy.WeekWork + " days' work a week. Stake out a Granary first, then the Bailiff's Hall, the Castle and the Church.", LogKind.Info);
+            t.AddLog("Taxes climb the chain: every Friday the reeve collects from each household into the chest at the village cross. On Monday it goes to " + t.Title(steward) + ", the king's steward, who brings it to the king on Tuesday. Each keeps a share.", LogKind.Crown);
+            t.AddLog("Serfs owe the king " + t.Policy.WeekWork + " days' work a week. Stake out a Granary first, then the Steward's Hall, the Castle and the Church. Later, found new villages with a Village Cross and raise a baron in one with a Manor.", LogKind.Info);
             return t;
         }
 

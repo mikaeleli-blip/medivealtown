@@ -277,7 +277,7 @@ namespace MedievalTown.Game
             {
                 if (!File.Exists(SavePath)) return null;
                 var t = JsonUtility.FromJson<Town>(File.ReadAllText(SavePath));
-                if (t == null || t.Version < 1 || t.Version > Town.CurrentVersion || t.Terrain == null || t.Terrain.Length != Town.Cols * Town.Rows) return null;
+                if (t == null || t.Version < 3 || t.Version > Town.CurrentVersion || t.Terrain == null || t.Terrain.Length != Town.Cols * Town.Rows) return null;
                 t.AfterLoad();
                 return t;
             }

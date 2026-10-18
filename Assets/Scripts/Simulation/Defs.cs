@@ -6,12 +6,12 @@ namespace MedievalTown.Simulation
     /// <summary>Saves store these as numbers: only append.</summary>
     public enum BuildingType
     {
-        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, BailiffHall, Wall, WallTower, Gatehouse
+        Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, StewardHall, Wall, WallTower, Gatehouse, VillageCross, Manor
     }
-    public enum Category { Roads, Homes, Fields, Works, Church, Crown, Hidden }
+    public enum Category { Roads, Homes, Fields, Works, Church, Crown, Realm, Hidden }
 
     /// <summary>Where someone stands in the order of things, from the bottom up.</summary>
-    public enum Rank { Serf, Freeman, Reeve, Bailiff, Priest, Knight, Noble, King }
+    public enum Rank { Serf, Freeman, Reeve, Collector, Steward, Priest, Knight, Baron, Noble, King }
 
     /// <summary>What someone is doing today.</summary>
     public enum Chore { None, OwnStrip, WeekWork, Build, Gather, Trade, Mass, Pray, Court, Patrol, Play, Rest, Flee, Collect, Deliver, Accounts }
@@ -49,7 +49,7 @@ namespace MedievalTown.Simulation
     /// <summary>All tunable numbers live here so balancing happens in one place.</summary>
     public static class Balance
     {
-        public const int Cols = 160, Rows = 110;   // 16 px tiles
+        public const int Cols = 224, Rows = 160;   // 16 px tiles
         public const int GoodCount = 6;
         public static readonly int[] SeasonDays = { 14, 21, 21, 14 };
         public const int DaysPerYear = 70, StartYear = 1240;
@@ -96,9 +96,14 @@ namespace MedievalTown.Simulation
         public const float StartCoin = 100f;
         public static readonly float[] StartStock = { 420f, 0f, 60f, 70f, 30f, 0f };
 
+        // ---- villages and baronies
+        public const int VillageRadius = 14;       // tiles from a village cross that belong to its village
+        public const int BaronyReach = 45;         // a new village this close to a baron's manor falls under him
+        public const float BaronStartLoyalty = 65f;
+
         // ---- the officers
         public const float SkimMax = 0.35f;        // the most a thoroughly crooked officer takes on top of his cut
-        public const int BailiffArrives = 6;       // days for a new bailiff to come after one's dismissed
+        public const int StewardArrives = 6;       // days for a new steward to come after one's dismissed
         public const int RevoltDays = 14;          // days of near-zero loyalty before the village rises
 
         // ---- people
@@ -131,21 +136,23 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Alehouse, Category = Category.Works, Name = "Alehouse", Blurb = "A freeman brews ale from grain and sells it of an evening. A cup now and then keeps folk content.", W = 2, H = 2, Timber = 14, Stone = 2, Work = 8, Workers = 2, WorkerRank = Rank.Freeman, Color = "#c49a3a" });
             Add(new BuildingDef { Type = BuildingType.Pavilion, Category = Category.Hidden, Name = "Royal Pavilion", Blurb = "A striped tent where the royal family lives until the castle is built.", W = 2, H = 2, Beds = 12, IsHome = true, Color = "#b5432f" });
             Add(new BuildingDef { Type = BuildingType.Cart, Category = Category.Hidden, Name = "Baggage Cart", Blurb = "Everything the household brought. It's unloaded into the granary once one stands.", W = 2, H = 2, IsStorage = true, Color = "#8a5a34" });
-            Add(new BuildingDef { Type = BuildingType.BailiffHall, Category = Category.Crown, Name = "Bailiff's Hall", Blurb = "Where the king's bailiff lives and keeps the tax chest. The reeve brings the village's taxes here every Friday; the bailiff takes them on to the castle on Saturday.", W = 3, H = 2, Timber = 16, Stone = 18, Work = 12, Unique = true, IsHome = true, Beds = 4, Color = "#3e5a7a" });
+            Add(new BuildingDef { Type = BuildingType.StewardHall, Category = Category.Crown, Name = "Steward's Hall", Blurb = "Where the king's steward lives and keeps the crown's tax chest. His collector brings the taxes here every Monday; the steward takes them on to the castle on Tuesday.", W = 3, H = 2, Timber = 16, Stone = 18, Work = 12, Unique = true, IsHome = true, Beds = 4, Color = "#3e5a7a" });
+            Add(new BuildingDef { Type = BuildingType.VillageCross, Category = Category.Realm, Name = "Village Cross", Blurb = "Founds a new village: a stone cross and a well on a green. Homes, strips and works within 14 tiles belong to it. Families come once there are cottages, and they choose their own reeve.", W = 2, H = 2, Timber = 2, Stone = 6, Work = 3, Color = "#d8c8a0" });
+            Add(new BuildingDef { Type = BuildingType.Manor, Category = Category.Realm, Name = "Baron's Manor", Blurb = "Makes a village the seat of a barony. A baron comes to live here with his tax collector. Villages you found nearby will owe their taxes to him, and he to the crown.", W = 4, H = 3, Timber = 30, Stone = 40, Work = 30, IsHome = true, Beds = 6, Color = "#7a3a4a" });
             Add(new BuildingDef { Type = BuildingType.Wall, Category = Category.Crown, Name = "Castle Wall", Blurb = "A stone curtain wall with a walkway and battlements. Drag to lay a line of it; it joins up with towers and the gatehouse. Nobody can walk through it.", W = 1, H = 1, Stone = 3, Work = 1, IsWall = true, Color = "#6e6860" });
             Add(new BuildingDef { Type = BuildingType.WallTower, Category = Category.Crown, Name = "Wall Tower", Blurb = "A round stone tower to anchor the corners and long runs of the wall.", W = 2, H = 2, Timber = 4, Stone = 20, Work = 8, IsWall = true, Color = "#7a746a" });
             Add(new BuildingDef { Type = BuildingType.Gatehouse, Category = Category.Crown, Name = "Gatehouse", Blurb = "Twin towers over an arched gate with a portcullis. The way through the walls.", W = 3, H = 2, Timber = 8, Stone = 30, Work = 14, IsWall = true, Color = "#8a847a" });
         }
 
-        public static readonly Category[] PaletteOrder = { Category.Roads, Category.Homes, Category.Fields, Category.Works, Category.Church, Category.Crown };
-        public static readonly string[] CategoryNames = { "Tracks", "Homes", "Fields", "Works", "Church", "Crown", "" };
+        public static readonly Category[] PaletteOrder = { Category.Roads, Category.Homes, Category.Fields, Category.Works, Category.Church, Category.Crown, Category.Realm };
+        public static readonly string[] CategoryNames = { "Tracks", "Homes", "Fields", "Works", "Church", "Crown", "Realm", "" };
         public static IEnumerable<BuildingDef> InCategory(Category c) { foreach (var d in all.Values) if (d.Category == c) yield return d; }
 
         public static readonly string[] Seasons = { "Spring", "Summer", "Autumn", "Winter" };
         public static readonly string[] Weekdays = { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
         public static readonly string[] GoodNames = { "Grain", "Flour", "Firewood", "Timber", "Stone", "Ale" };
 
-        public static readonly string[] RankNames = { "Serf", "Freeman", "Reeve", "Bailiff", "Priest", "Knight", "Royal", "King" };
+        public static readonly string[] RankNames = { "Serf", "Freeman", "Reeve", "Collector", "Steward", "Priest", "Knight", "Baron", "Royal", "King" };
         public static string RankName(Citizen p)
         {
             if (p.IsChild) return p.Rank >= Rank.Noble ? (p.Female ? "Princess" : "Prince") : "Child";
@@ -153,7 +160,9 @@ namespace MedievalTown.Simulation
             {
                 case Rank.King: return p.Female ? "Queen regnant" : "King";
                 case Rank.Noble: return p.Female ? (p.PartnerId >= 0 ? "Queen" : "Princess") : (p.PartnerId >= 0 ? "Prince consort" : "Prince");
-                case Rank.Bailiff: return "The king's bailiff";
+                case Rank.Steward: return "The king's steward";
+                case Rank.Baron: return p.Female ? "Baroness" : "Baron";
+                case Rank.Collector: return "Tax collector";
                 case Rank.Knight: return "Knight";
                 case Rank.Priest: return "Priest";
                 case Rank.Reeve: return "Reeve";
@@ -194,6 +203,8 @@ namespace MedievalTown.Simulation
         public static readonly string[] KnightNames = { "Fitzroy", "de Cressy", "Malet", "de Grey", "Basset", "de Tracy", "Peverel", "de Hastings", "Mauduit", "de Burgh" };
         public static readonly string[] Kings = { "Edmund", "Aldric", "Henry", "Stephen", "Edward", "Richard" };
         public static readonly string[] Ordinals = { "", " II", " III", " IV", " V" };
+        public static readonly string[] VillageNames = { "Ashby", "Thornbury", "Oakhurst", "Wexley", "Hollowmere", "Elmstead", "Brackenford", "Coldharbour", "Wyndham", "Fernley",
+            "Millbrook", "Stonebridge", "Harwick", "Lindale", "Ravensby", "Kettlewell", "Marston", "Bramley", "Hawkridge", "Whitmoor", "Dunham", "Ely Cross", "Fallowfield", "Greystead" };
         public static readonly string[] Saints = { "St Michael", "St Mary", "St Peter", "St Andrew", "St Botolph", "St Giles", "All Saints", "St Lawrence" };
     }
 }
