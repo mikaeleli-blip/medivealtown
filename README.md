@@ -164,6 +164,11 @@ Goods are local. Nothing is shared across the whole map any more.
 | **Freemen** | Run the trades and shops for themselves, or work the crown's mill, woods and quarry for its wage. Pay rent (0.6c a week) and the market toll, and buy bread, grain and firewood. |
 | **Serfs** | Owe the king week-work: 2 days a week by custom, on his building sites, carting stone and timber, and gathering his wood. When there's nothing to do they go back to their own strips, which they work the rest of the week. Sunday is for mass. |
 
+**Families and land.** A serf family only settles where there's an empty cottage *and* a strip field going spare. A big
+family (five or more) takes a second strip if one's free, and gives it up to a newcomer family that has none. Families
+hold off having children when their village is short of grain, and the **Laws** can stop births altogether (the royal
+family may always have heirs).
+
 **Loyalty** to the crown drifts toward what folk feel they deserve. It depends on whether they are fed, warm and housed,
 the taxes and dues, a reeve who doesn't squeeze them, how devout they are, an evening cup at the alehouse and the
 king's temperament. Below 15, families slip away by night. If the village is loyal, new families come.

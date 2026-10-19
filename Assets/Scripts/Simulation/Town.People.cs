@@ -135,31 +135,62 @@ namespace MedievalTown.Simulation
                 int now = old != null ? HouseholdOf(old) : -1;
                 s.HolderId = heads.Contains(now) ? now : -1;
             }
-            var holding = new HashSet<int>(strips.Where(s => s.HolderId >= 0).Select(s => s.HolderId));
-            var dupes = strips.Where(s => s.HolderId >= 0).GroupBy(s => s.HolderId).Where(g => g.Count() > 1).SelectMany(g => g.Skip(1)).ToList();
-            foreach (var s in dupes) s.HolderId = -1;
-            var without = heads.Where(h => !holding.Contains(h)).ToList();
-            // a family takes a strip in its own village, or else the nearest one going
-            foreach (var s in strips.Where(s => s.HolderId < 0))
+            // no family holds more than two
+            foreach (var g in strips.Where(x => x.HolderId >= 0).GroupBy(x => x.HolderId).Where(g => g.Count() > 2).ToList())
+                foreach (var x in g.Skip(2)) x.HolderId = -1;
+            var count = new Dictionary<int, int>();
+            foreach (var x in strips) if (x.HolderId >= 0) { int c; count.TryGetValue(x.HolderId, out c); count[x.HolderId] = c + 1; }
+            Func<int, int> held = id => { int c; return count.TryGetValue(id, out c) ? c : 0; };
+            Action<Building, int> give = (st, id) => { if (st.HolderId >= 0) count[st.HolderId]--; st.HolderId = id; int c; count.TryGetValue(id, out c); count[id] = c + 1; };
+            var without = heads.Where(h => held(h) == 0).ToList();
+            Func<int, Building, int> dist = (id, st) =>
             {
-                if (without.Count == 0) break;
-                int pick = -1, best = int.MaxValue;
-                foreach (var id in without)
+                var home = HomeOf(GetCitizen(id)); if (home == null) return int.MaxValue / 2;
+                int dx = home.X - st.X, dy = home.Y - st.Y; return dx * dx + dy * dy + (home.VillageId == st.VillageId && st.VillageId >= 0 ? 0 : 100000);
+            };
+            // every family gets a strip before any gets a second: a family without one takes a free strip, or else a big family's second
+            foreach (var id in without.ToList())
+            {
+                var free = strips.Where(x => x.HolderId < 0).OrderBy(x => dist(id, x)).FirstOrDefault();
+                if (free == null) free = strips.Where(x => x.HolderId >= 0 && held(x.HolderId) > 1).OrderBy(x => dist(id, x)).FirstOrDefault();
+                if (free == null) break;
+                give(free, id); without.Remove(id);
+            }
+            // strips still going spare go to big families as a second strip, in their own village
+            foreach (var st in strips.Where(x => x.HolderId < 0).ToList())
+            {
+                int pick = -1, bestSize = 4;
+                foreach (var id in heads)
                 {
-                    var home = HomeOf(GetCitizen(id)); if (home == null) continue;
-                    int dx = home.X - s.X, dy = home.Y - s.Y, d = dx * dx + dy * dy + (home.VillageId == s.VillageId && s.VillageId >= 0 ? 0 : 100000);
-                    if (d < best) { best = d; pick = id; }
+                    if (held(id) != 1) continue;
+                    var home = HomeOf(GetCitizen(id)); if (home == null || home.VillageId != st.VillageId) continue;
+                    if (home.Residents.Count > bestSize) { bestSize = home.Residents.Count; pick = id; }
                 }
-                if (pick < 0) pick = without[0];
-                s.HolderId = pick; without.Remove(pick);
+                if (pick >= 0) give(st, pick);
             }
         }
 
+        /// <summary>Strip fields in a village a newcomer family could take: free ones, and big families' second strips.</summary>
+        public int SpareStrips(int villageId)
+        {
+            int strips = Buildings.Count(b => b.Built && b.Type == BuildingType.Strip && b.VillageId == villageId);
+            int families = Buildings.Count(b => b.Built && b.Type == BuildingType.Cottage && b.Residents.Count > 0 && b.VillageId == villageId && HeadOf(b) != null && HeadOf(b).Rank != Rank.Freeman);
+            return strips - families;
+        }
+
+        /// <summary>The family's strip that most wants work today (a big family may hold two).</summary>
         public Building StripOf(Citizen p)
         {
             int head = HouseholdOf(p);
-            foreach (var b in Buildings) if (b.Type == BuildingType.Strip && b.Built && b.HolderId == head) return b;
-            return null;
+            Building first = null, best = null; float bestScore = float.MaxValue;
+            foreach (var b in Buildings)
+            {
+                if (b.Type != BuildingType.Strip || !b.Built || b.HolderId != head) continue;
+                if (first == null) first = b;
+                float score = Season <= 1 ? b.CropGrowth : -b.CropLeft;
+                if (score < bestScore) { bestScore = score; best = b; }
+            }
+            return best ?? first;
         }
 
         /// <summary>Freemen take up the trades: the woodward's lodge, the quarry, the mill and the alehouse.</summary>
@@ -222,6 +253,10 @@ namespace MedievalTown.Simulation
                 int kids = People.Count(c => c.MotherId == mom.Id && c.Age < 2);
                 if (kids > 0) continue;
                 if (mom.Fed < 0.6f) continue;
+                // the law can forbid it (the royal family always may have heirs); and families hold off when the village is short of grain
+                bool royal = mom.IsNoble || dad.IsNoble;
+                if (!royal && !Policy.Births) continue;
+                if (!royal) { var mv = VillageOf(mom); if (mv != null && GrainDays(mv) < 10 && DaysUntilHarvest > 10) continue; }
                 if (Chance(1 / 110.0)) mom.Pregnant = 40;
             }
 
@@ -312,7 +347,9 @@ namespace MedievalTown.Simulation
             int openJobs = Buildings.Where(b => b.Built && b.Def.Workers > 0).Sum(b => b.Def.Workers - b.Employees.Count);
             var freeHouse = empty.FirstOrDefault(b => b.Type == BuildingType.FreeHouse);
             bool free = openJobs > 0 && (freeHouse != null || !People.Any(p => p.Rank == Rank.Freeman && p.WorkId < 0 && !p.IsChild));
-            if (!free && !empty.Any(b => b.Type == BuildingType.Cottage)) return;
+            // a serf family only comes to an empty cottage in a village with a strip field going spare: no land, no living
+            var cottages = empty.Where(b => b.Type == BuildingType.Cottage && SpareStrips(b.VillageId) > 0).ToList();
+            if (!free && cottages.Count == 0) return;
             if (!Chance(0.5)) return;
             Rank rank = free ? Rank.Freeman : Rank.Serf;
             string fam = Pick(Defs.PeasantNames);
@@ -322,7 +359,7 @@ namespace MedievalTown.Simulation
             int n = Rng.Next(0, 3);
             for (int k = 0; k < n; k++) Child(mom, dad, Rnd(0.5f, 10));
             Arrived += 2 + n;
-            var home = rank == Rank.Freeman ? (freeHouse ?? empty[0]) : empty.OrderBy(b => Rng.Next()).First(b => b.Type == BuildingType.Cottage);
+            var home = rank == Rank.Freeman ? (freeHouse ?? empty[0]) : cottages[Rng.Next(cottages.Count)];
             var hv = VillageOf(home);
             // they bring enough to see them to their first harvest, roughly
             home.Stock[(int)Good.Cloth] += 2 + n;

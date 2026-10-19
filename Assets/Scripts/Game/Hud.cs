@@ -218,6 +218,11 @@ namespace MedievalTown.Game
                 int rags = T.Buildings.Count(b => b.Built && b.Residents.Count > 0 && T.Ragged(b));
                 if (rags > 0) lines.Add(new KeyValuePair<string, bool>((rags == 1 ? "A family is" : rags + " families are") + " short of clothes for the cold. A Sheepfold and a Weaver's House make cloth.", false));
             }
+            foreach (var v in T.Villages)
+            {
+                bool emptyCottage = T.Buildings.Any(b => b.Built && b.Type == BuildingType.Cottage && b.Residents.Count == 0 && b.VillageId == v.Id);
+                if (emptyCottage && T.SpareStrips(v.Id) == 0) { lines.Add(new KeyValuePair<string, bool>(v.Name + " has an empty cottage but no strip field to go with it. No family will settle.", false)); break; }
+            }
             if (T.OfType(BuildingType.Bakehouse).Any() && T.WorkingMill == null) lines.Add(new KeyValuePair<string, bool>("The bakehouse needs a working windmill.", false));
             if (lines.Count == 0) return;
             float w = 0; foreach (var l in lines) w = Mathf.Max(w, PixelFont.Width(l.Key));
@@ -750,6 +755,9 @@ namespace MedievalTown.Game
             pol.SellSurplus = Ui.Toggle(new Rect(bx, by, bw, 11), pol.SellSurplus, "Sell spare grain to the merchant"); by += 14;
             pol.BuyMaterials = Ui.Toggle(new Rect(bx, by, bw, 11), pol.BuyMaterials, "Buy timber and stone for waiting sites"); by += 14;
             pol.Dole = Ui.Toggle(new Rect(bx, by, bw, 11), pol.Dole, "The granary feeds the hungry"); by += 14;
+            Heading("Families");
+            pol.Births = Ui.Toggle(new Rect(bx, by, bw, 11), pol.Births, "Couples have children"); by += 14;
+            Para("Off: no children are born outside the royal family. Families hold off on their own when their village is short of grain. New serf families only settle where there's a cottage and a strip field going spare.");
             Para("A gentle king feeds the hungry whatever the laws say.");
 
             Heading("This week");

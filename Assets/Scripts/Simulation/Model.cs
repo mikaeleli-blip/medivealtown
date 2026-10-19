@@ -116,6 +116,7 @@ namespace MedievalTown.Simulation
         public float Reserve = 200f;       // grain the granary keeps back beyond the household's needs until harvest
         public bool BuyMaterials = true;   // buy timber and stone from the merchant for waiting building sites
         public float CoinReserve = 40f;    // coin the treasury won't spend on materials
+        public bool Births = true;         // couples have children (the royal family always may)
         public float MarketToll = 0.1f;    // the crown's share of every sale a shop makes, collected by the reeve
     }
 
