@@ -200,8 +200,9 @@ namespace MedievalTown.Game
             if (homeless > 0 && si >= 1) lines.Add(new KeyValuePair<string, bool>(homeless + " in tents. Build cottages before " + (si == 1 ? "autumn." : "the cold kills them."), si >= 2));
             int noStrip = T.Buildings.Count(b => { if (!b.Built || b.Type != BuildingType.Cottage || b.Residents.Count == 0) return false; var hd = T.HeadOf(b); return hd != null && hd.Rank != Rank.Freeman && T.StripOf(hd) == null; });
             if (noStrip > 0) lines.Add(new KeyValuePair<string, bool>((noStrip == 1 ? "A serf family has" : noStrip + " serf families have") + " no strip field. They'll go hungry.", true));
-            float need = T.HouseholdKeep;
+            float need = T.HouseholdKeep, year = T.CourtYear;
             if (si <= 1 && need > 0 && T.StoreStock(Good.Grain) < need * 0.9f) lines.Add(new KeyValuePair<string, bool>("The granary won't feed the court until harvest.", T.StoreStock(Good.Grain) < need * 0.5f));
+            else if (year > 0 && T.StoreStock(Good.Grain) < year * 0.5f) lines.Add(new KeyValuePair<string, bool>("The royal granary holds less than half a year's bread for the court.", false));
             if (T.Steward == null) lines.Add(new KeyValuePair<string, bool>("No steward: the tax chest waits until a new one comes.", false));
             foreach (var v in T.Villages) if (T.ReeveOf(v) == null && T.PopulationOf(v) > 0) lines.Add(new KeyValuePair<string, bool>("No reeve in " + v.Name + ": nobody is collecting its taxes.", true));
             foreach (var bar in T.Baronies) if (bar.Rebel) lines.Add(new KeyValuePair<string, bool>(T.Title(T.GetCitizen(bar.BaronId)) + " is withholding his taxes.", true));
@@ -750,8 +751,9 @@ namespace MedievalTown.Game
             pol.FreeWage = SliderRow("Day wage", M(pol.FreeWage), pol.FreeWage, 0.1f, 2f, 0.05f, "What the crown pays freemen for a day at the mill, the woods, the quarry or a building site.");
             pol.GrainPrice = SliderRow("Grain price", M(pol.GrainPrice) + " a measure", pol.GrainPrice, 0.05f, 1f, 0.05f, "What freemen pay for the king's grain on market day.");
             Heading("The granary");
-            pol.Reserve = SliderRow("Reserve", Mathf.RoundToInt(pol.Reserve) + " grain", pol.Reserve, 0, 800, 20,
-                "Grain kept back above what the court needs until harvest. The merchant buys the rest on market day.");
+            Ui.Text(bx, by, "Stock " + Mathf.RoundToInt(T.StoreStock(Good.Grain)) + " / target " + Mathf.RoundToInt(T.CrownTarget) + " (court's year " + Mathf.RoundToInt(T.CourtYear) + ")", Ui.InkSoft); by += 11;
+            pol.FamineDays = SliderRow("Famine store", Mathf.RoundToInt(pol.FamineDays) + " days", pol.FamineDays, 0, 120, 5,
+                "Days of grain for every crown family kept on top of the court's year, for petitions, the dole and bad harvests. Merchants only buy what's above it.");
             pol.SellSurplus = Ui.Toggle(new Rect(bx, by, bw, 11), pol.SellSurplus, "Sell spare grain to the merchant"); by += 14;
             pol.BuyMaterials = Ui.Toggle(new Rect(bx, by, bw, 11), pol.BuyMaterials, "Buy timber and stone for waiting sites"); by += 14;
             pol.Dole = Ui.Toggle(new Rect(bx, by, bw, 11), pol.Dole, "The granary feeds the hungry"); by += 14;

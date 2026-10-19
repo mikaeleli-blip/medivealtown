@@ -118,7 +118,8 @@ namespace MedievalTown.Simulation
         // ---- merchants
         public const float CartLoad = 80f;          // what a merchant's cart carries (a measure of grain counts one, a beast or a length of cloth five)
         public const float MerchantBuys = 0.9f, MerchantWholesale = 1.15f, MerchantRetail = 1.3f;   // of the going price
-        public const float MerchantStake = 12f;     // the savings a merchant sets up with
+        public const float MerchantStake = 12f;
+        public const float GrainSpoil = 0.0007f;    // grain lost in store each day (about 5% a year)     // the savings a merchant sets up with
         public const int PetitionDays = 7;          // days a village waits for the king's answer        // what a supplier lets a shop have on credit, paid back from its takings
 
         // ---- villages and baronies

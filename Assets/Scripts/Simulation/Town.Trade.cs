@@ -219,7 +219,7 @@ namespace MedievalTown.Simulation
                     // the king's granary sells what it can spare, and lets a shop with an empty purse have some on credit
                     float credit = b.DebtTo < 0 || b.DebtTo == CrownCredit ? Math.Max(0, Balance.CreditLimit - b.Debt) : 0;
                     var bv = VillageOf(b);
-                    float avail = dom < 0 && (bv == null || bv.Capital || !BarnsOf(bv).Any()) ? Math.Max(0, StoreStock(Good.Grain) - RoyalKeep * 0.5f) : Math.Max(0, LocalStock(bv, Good.Grain) - 20);
+                    float avail = dom < 0 && (bv == null || bv.Capital || !BarnsOf(bv).Any()) ? Math.Max(0, StoreStock(Good.Grain) - HomeKeep) : Math.Max(0, LocalStock(bv, Good.Grain) - 20);   // the granary keeps the court's and the freemen's bread back from the baker
                     if (want >= 1 && purse + credit >= Policy.GrainPrice)
                     {
                         float q = Math.Min(want, Math.Min((purse + credit) / Math.Max(0.01f, Policy.GrainPrice), avail));

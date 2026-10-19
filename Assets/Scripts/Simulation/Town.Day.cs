@@ -180,6 +180,7 @@ namespace MedievalTown.Simulation
             foreach (var s in Sites.ToList()) if (s.Progress >= s.Def.Work - 0.001f && s.MaterialsFraction >= 0.999f) OnBuilt(s, false);
 
             Milling();
+            Spoilage();
             Shopping();
             Eating(si);
             Warmth(si);
@@ -460,7 +461,10 @@ namespace MedievalTown.Simulation
         /// <summary>Grain the granary must keep to feed the lord's household until the harvest is in.</summary>
         public float HouseholdKeep { get { return RoyalNeeds() / (WorkingMill != null ? 1f : Balance.GrainFeeds) * DaysUntilHarvest - StoreStock(Good.Flour); } }
         /// <summary>What the merchant may not buy: the household's keep plus the reserve the lord sets.</summary>
-        public float RoyalKeep { get { return Math.Max(0, HouseholdKeep) + FreemenKeep + Policy.Reserve; } }
+        /// <summary>What the merchant may not buy from the royal granary: its whole stockpile target.</summary>
+        public float RoyalKeep { get { return CrownTarget; } }
+        /// <summary>What the royal granary keeps back from the baker and the barons: the court's and the freemen's bread until harvest.</summary>
+        public float HomeKeep { get { return (Math.Max(0, HouseholdKeep) + FreemenKeep + 200) * 0.5f; } }
         /// <summary>Grain the freemen will want to buy from the granary until the harvest (they have no strips of their own).</summary>
         public float FreemenKeep
         {
@@ -761,18 +765,22 @@ namespace MedievalTown.Simulation
             }
             // the crown buys grain when the granary won't feed the court until harvest: from its own villagers first, then the merchant
             {
-                float want = HouseholdKeep + 30 - StoreStock(Good.Grain);
+                // up to the harvest from what families can spare; on up to the court's year only from big surpluses
+                float want = CourtYear - StoreStock(Good.Grain), urgent = CourtHold - StoreStock(Good.Grain);
                 foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0 && DomainOf(b) < 0).ToList())
                 {
                     if (want < 1 || Coin - Policy.CoinReserve * 0.5f < Balance.VillageGrain) break;
-                    float spare = h.Stock[(int)Good.Grain] - GrainKeep(h);
+                    float spare = FamilySpare(h);
+                    if (urgent > 0) spare = Math.Max(spare, Math.Min(urgent, h.Stock[(int)Good.Grain] - GrainKeep(h)));
                     if (spare < 3) continue;
                     float bq = (float)Math.Floor(Math.Min(Math.Min(spare, want), (Coin - Policy.CoinReserve * 0.5f) / Balance.VillageGrain));
+                    urgent -= bq;
                     if (bq < 1) continue;
                     h.Stock[(int)Good.Grain] -= bq; PutInStores(Good.Grain, bq); want -= bq;
                     float pay = bq * Balance.VillageGrain; Coin -= pay; WeekOut += pay; Book("Bought grain from villagers", -pay);
                     var seller = HeadOf(h); if (seller != null) seller.Coin += pay;
                 }
+                want = Math.Min(want, CrownFloor - StoreStock(Good.Grain));   // from outside only in real need
                 float q = (float)Math.Floor(Math.Min(Math.Min(want, 120f), (Coin - Policy.CoinReserve * 0.5f) / Balance.BuyGrain));
                 if (q >= 5)
                 {

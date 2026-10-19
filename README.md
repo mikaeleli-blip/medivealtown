@@ -124,7 +124,12 @@ Goods are local. Nothing is shared across the whole map any more.
   and the grain its families and shops buy first. A village without a barn draws on its lord's granary: the baron's
   manor in a barony, the royal granary in the crown's own villages. The capital's store is the Royal Granary.
 - **A barony's grain taxes stay in the barony**, in the baron's granary at the manor. Only coin goes on to the crown.
-  The baron's granary keeps back what his own household needs until harvest; if it runs short he buys from the king.
+  The baron's granary keeps a year's bread for his household; if it runs short he buys from the king.
+- **Stockpiles.** The royal granary aims to hold a year of the court's bread plus a **famine store** (10 days' grain for
+  every crown family, set in the Laws). Its own freemen, shops, dole and petitions can draw on it, but merchants only
+  buy what's above the full target, so the crown never sells at harvest and buys back before the next. A baron's
+  granary keeps the same famine store for his villages before anything leaves the barony. Grain slowly spoils in store
+  (about 5% a year). The crown buys from outside only when it can't feed the court until harvest.
 - **Folk shop in their own barony** (or the crown's lands) and nowhere else. What they wanted and couldn't buy shows on
   the village cross as **Short of**, along with how many days of grain it has.
 - **Petitions.** A village that's going hungry before the harvest sends its reeve to court to beg grain. Answer in the
@@ -133,9 +138,12 @@ Goods are local. Nothing is shared across the whole map any more.
 - **Purveyance.** If the royal (or a baron's) table is bare, his men take grain from the villagers' own stores for a
   pittance, and folk hate it.
 - **Merchants.** Build a **Merchant's House** in a barony (one each). A freeman merchant trades on his own purse:
-  Monday he buys what his barony has to spare and the capital wants, Tuesday he takes the road, Wednesday he sells at the
+  Monday he buys what his barony has to spare and the capital wants (a little from every seller, never emptying one), Tuesday he takes the road, Wednesday he sells at the
   capital's market and buys what his barony is short of, Thursday he comes home, Friday and market day he sells it to
   the barony's shops, its granary, or to families straight off his cart. He only trades with the capital for now.
+  **What counts as spare:** families sell only out of a big surplus (over twice the grain they keep); a shop keeps two
+  weeks of what it sells and a third of its stock, and sells nothing at all while its own village is short of that good;
+  the lord's granary sells last, from above its stockpile.
 
 ![Village barn, merchant's house, royal granary and a manor](docs/barn-merchant.png)
 
@@ -234,7 +242,7 @@ The four books at the top right:
   with its reeve and a new-reeve button. Click a village to go to its cross. Also the tax ledger (owed → reeves kept →
   barons kept → steward kept → reached the castle, plus anything rebels withheld), the church and the village.
 - **The Laws:** harvest tax, market toll, hearth tax, tallage, the reeves', barons' and steward's shares, week-work, multure, freemen's rent
-  and wages, the grain price, the granary reserve, selling surplus, buying materials and the dole.
+  and wages, the grain price, the famine store, selling surplus, buying materials and the dole.
 - **Folk:** everyone, sortable by rank, loyalty, name or age.
 - **The Chronicle:** everything that's happened.
 

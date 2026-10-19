@@ -39,12 +39,50 @@ namespace MedievalTown.Simulation
             return BarnsOf(v).Concat(LordStores(DomainOf(v)));
         }
 
-        /// <summary>What a baron's granary holds back for his own household until the harvest; the barony only gets what's above it.</summary>
+        /// <summary>What a baron's granary holds back for his own household: a year's bread. His villagers can buy what's above it.</summary>
         float ManorKeep(Building manor, Good g)
         {
             if (manor.Type != BuildingType.Manor || (g != Good.Grain && g != Good.Flour)) return 0;
             float n = 0; foreach (var id in manor.Residents) { var p = GetCitizen(id); if (p != null) n += p.IsChild ? Balance.ChildAppetite : Balance.Appetite; }
-            return g == Good.Grain ? n * (DaysUntilHarvest + 10) / Balance.GrainFeeds : 0;
+            return g == Good.Grain ? n * Balance.DaysPerYear / Balance.GrainFeeds : 0;
+        }
+
+        // =====================================================================
+        // The crown's stockpile
+        // =====================================================================
+        /// <summary>What the court eats in a day: the royal family and knights, the steward and his collector, a priest with no church.</summary>
+        public float CourtNeeds
+        {
+            get
+            {
+                float n = 0;
+                foreach (var p in People)
+                    if (RoyalHousehold(p) || p.Rank == Rank.Steward || p.Id == Crown.CollectorId || (p.Rank == Rank.Priest && Church == null)) n += p.IsChild ? Balance.ChildAppetite : Balance.Appetite;
+                return n;
+            }
+        }
+        /// <summary>A year of the court's bread, which the royal granary never sells or gives away.</summary>
+        public float CourtYear { get { return CourtNeeds * Balance.DaysPerYear / (WorkingMill != null ? 1f : Balance.GrainFeeds); } }
+        /// <summary>The famine store: so many days' grain for every family in a domain, kept for bad years, petitions and the dole.</summary>
+        public float FamineStore(int domain)
+        {
+            float n = 0;
+            foreach (var h in Buildings) if (h.Built && IsPeasantHome(h.Type) && h.Residents.Count > 0 && DomainOf(h) == domain) n += Needs(h);
+            return n * Policy.FamineDays / Balance.GrainFeeds;
+        }
+        [NonSerialized] int targetDay = -1; [NonSerialized] float targetCache, yearCache;
+        void CacheTargets() { if (targetDay == Day) return; targetDay = Day; yearCache = CourtYear; targetCache = yearCache + FamineStore(-1); }
+        /// <summary>What the royal granary aims to hold: a year for the court and the famine store for the crown's villages.</summary>
+        public float CrownTarget { get { CacheTargets(); return targetCache; } }
+        /// <summary>Below this the crown buys grain from outside at the merchant's price: when the court can't eat until the harvest.</summary>
+        public float CrownFloor { get { return Math.Max(0, HouseholdKeep) + 30; } }
+
+        /// <summary>Grain spoils a little in store, so hoarding isn't free.</summary>
+        void Spoilage()
+        {
+            foreach (var b in Buildings)
+                if (b.Built && (b.Type == BuildingType.Granary || b.Type == BuildingType.VillageBarn || b.Type == BuildingType.Manor || b.Type == BuildingType.Cart))
+                { b.Stock[(int)Good.Grain] *= 1f - Balance.GrainSpoil; b.Stock[(int)Good.Flour] *= 1f - Balance.GrainSpoil * 2; }
         }
         float Avail(Building b, Good g, bool lords)
         {
@@ -54,7 +92,8 @@ namespace MedievalTown.Simulation
             return Math.Max(0, b.Stock[(int)g] - ManorKeep(b, g));
         }
         [NonSerialized] int courtHoldDay = -1; [NonSerialized] float courtHold;
-        /// <summary>Grain the royal granary won't sell or give away: what the court eats until the harvest, and a little over.</summary>
+        /// <summary>Grain the royal granary won't sell or give to its own people: what the court eats until the harvest, and a little over.
+        /// (Everything above the full stockpile target is what merchants may buy.)</summary>
         float CourtHold { get { if (courtHoldDay != Day) { courtHoldDay = Day; courtHold = Math.Max(0, HouseholdKeep) + 30; } return courtHold; } }
 
         public float LocalStock(Village v, Good g, bool lords = false) { float s = 0; foreach (var b in LocalStores(v)) s += Avail(b, g, lords); return s; }
@@ -172,9 +211,9 @@ namespace MedievalTown.Simulation
             {
                 var manor = GetBuilding(bar.ManorId); var baron = GetCitizen(bar.BaronId);
                 if (manor == null || baron == null) continue;
-                float shortBy = ManorKeep(manor, Good.Grain) + 20 - manor.Stock[(int)Good.Grain];
+                float shortBy = ManorKeep(manor, Good.Grain) * 0.4f + 20 - manor.Stock[(int)Good.Grain];
                 if (shortBy < 5) continue;
-                float q = Math.Min(Math.Min(shortBy, Math.Max(0, StoreStock(Good.Grain) - RoyalKeep * 0.5f)), baron.Coin / Policy.GrainPrice);
+                float q = Math.Min(Math.Min(shortBy, Math.Max(0, StoreStock(Good.Grain) - HomeKeep)), baron.Coin / Policy.GrainPrice);
                 if (q < 3) continue;
                 q = TakeFromStores(Good.Grain, q);
                 manor.Stock[(int)Good.Grain] += q; baron.Coin -= q * Policy.GrainPrice;
@@ -216,7 +255,7 @@ namespace MedievalTown.Simulation
         public void GrantPetition(Village v)
         {
             if (v == null || v.PetitionDay < 0) return;
-            float q = Math.Min(v.PetitionGrain, Math.Max(0, StoreStock(Good.Grain) - CourtHold * 0.5f));   // the court keeps enough to eat
+            float q = Math.Min(v.PetitionGrain, Math.Max(0, StoreStock(Good.Grain) - CourtHold * 0.5f));   // the famine store is for this; the court keeps enough to eat
             q = TakeFromStores(Good.Grain, q);
             var houses = HousesOf(v).ToList();
             float need = houses.Sum(Needs);
@@ -250,16 +289,32 @@ namespace MedievalTown.Simulation
             if (g == Good.Grain)
             {
                 float keep = 0;
-                foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0 && DomainOf(b) == domain)) { s += Math.Max(0, h.Stock[(int)Good.Grain] - GrainKeep(h)); keep += Needs(h); }
-                float stores = domain < 0 ? CrownSpareGrain : StoresIn(domain).Sum(b => Avail(b, Good.Grain, false)) - keep * 7;
-                return s + Math.Max(0, stores);
+                foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0 && DomainOf(b) == domain)) s += FamilySpare(h);
+                return s + LordSpare(domain);
             }
-            foreach (var shop in Buildings.Where(b => b.Built && b.Def.IsShop && b.Def.Sells == g && DomainOf(b) == domain)) s += Math.Max(0, shop.Stock[(int)g] - shop.Def.Cap * 0.5f);
-            return domain < 0 && DomainWants(domain, g) > 1 ? 0 : s;
+            if (DomainWants(domain, g) > 1) return 0;   // its own folk want it: none to spare
+            foreach (var shop in Buildings.Where(b => b.Built && b.Def.IsShop && b.Def.Sells == g && DomainOf(b) == domain)) s += ShopSpare(shop, g);
+            return s;
+        }
+
+        /// <summary>A family only sells to a merchant out of a big surplus: more than twice what it needs to keep.</summary>
+        float FamilySpare(Building h) { return Math.Max(0, h.Stock[(int)Good.Grain] - GrainKeep(h) * 2 - 20); }
+        /// <summary>A shop only sells to a merchant what its own village won't buy: it keeps two weeks of what it sells, and a third of its stock.</summary>
+        float ShopSpare(Building shop, Good g)
+        {
+            float price = shop.Def.Price > 0 ? shop.Def.Price : PriceOf(g);
+            float keep = Math.Max(shop.Def.Cap * 0.3f, shop.LastSales / price * 2);
+            return Math.Max(0, shop.Stock[(int)g] - keep);
+        }
+        /// <summary>Grain a lord will sell to merchants: what's above his household's year and his villages' famine store.</summary>
+        float LordSpare(int domain)
+        {
+            if (domain < 0) return CrownSpareGrain;
+            return Math.Max(0, StoresIn(domain).Sum(b => Avail(b, Good.Grain, false)) - FamineStore(domain));
         }
 
         /// <summary>Grain the royal granary can spare to merchants: above what the court and the freemen need till harvest, and half the reserve.</summary>
-        public float CrownSpareGrain { get { return Math.Max(0, StoreStock(Good.Grain) - Math.Max(0, HouseholdKeep) - FreemenKeep - Policy.Reserve * 0.5f); } }
+        public float CrownSpareGrain { get { return Math.Max(0, StoreStock(Good.Grain) - CrownTarget); } }
 
         /// <summary>All the granaries of a domain: the lord's and the village barns.</summary>
         IEnumerable<Building> StoresIn(int domain)
@@ -276,47 +331,53 @@ namespace MedievalTown.Simulation
             {
                 // villages running low, and the lord's own granary short of what his household needs
                 foreach (var v in Villages.Where(x => DomainOf(x) == domain)) { float days = GrainDays(v); if (days < 7) d += HousesOf(v).Sum(Needs) * (10 - days); }
-                if (domain < 0) d += Math.Max(0, Math.Max(0, HouseholdKeep) + 30 - StoreStock(Good.Grain));
-                else { var bar = GetBarony(domain); var manor = bar != null ? GetBuilding(bar.ManorId) : null; if (manor != null) d += Math.Max(0, ManorKeep(manor, Good.Grain) + 20 - manor.Stock[(int)Good.Grain]); }
+                if (domain < 0) d += Math.Max(0, CourtHold - StoreStock(Good.Grain));
+                else { var bar = GetBarony(domain); var manor = bar != null ? GetBuilding(bar.ManorId) : null; if (manor != null) d += Math.Max(0, ManorKeep(manor, Good.Grain) * 0.4f + 20 - manor.Stock[(int)Good.Grain]); }
             }
             return d;
         }
 
-        /// <summary>Takes up to q of a domain's spare goods, paying whoever held them. Returns what was bought.</summary>
+        /// <summary>Takes up to q of a domain's spare goods, a little from each seller rather than emptying the first, paying whoever held
+        /// them. Families sell only big surpluses, shops only what their own village won't buy, and the lord's granary last.</summary>
         float BuyFrom(int domain, Good g, float q, Citizen buyer, float unitPrice)
         {
-            float got = 0;
+            var sellers = new List<KeyValuePair<float, Action<float>>>();   // spare, and how to take an amount of it
             if (g == Good.Grain)
+                foreach (var h0 in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0 && DomainOf(b) == domain).ToList())
+                {
+                    var h = h0; float spare = FamilySpare(h); if (spare < 2) continue;
+                    sellers.Add(new KeyValuePair<float, Action<float>>(spare, t => { h.Stock[(int)Good.Grain] -= t; var seller = HeadOf(h); if (seller != null) seller.Coin += t * unitPrice; }));
+                }
+            else if (DomainWants(domain, g) <= 1)
+                foreach (var s0 in Buildings.Where(b => b.Built && b.Def.IsShop && b.Def.Sells == g && DomainOf(b) == domain).ToList())
+                {
+                    var shop = s0; float spare = ShopSpare(shop, g); if (spare < 0.2f) continue;
+                    sellers.Add(new KeyValuePair<float, Action<float>>(spare, t => { shop.Stock[(int)g] -= t; Takings(shop, t * unitPrice); }));
+                }
+            float got = 0;
+            float total = sellers.Sum(x => x.Key);
+            float want = Math.Min(q, buyer.Coin / unitPrice);
+            if (total > 0 && want > 0)
             {
-                foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0 && DomainOf(b) == domain).ToList())
+                // the same share from each
+                float frac = Math.Min(1f, want / total);
+                foreach (var s1 in sellers)
                 {
-                    if (got >= q || buyer.Coin < unitPrice) break;
-                    float spare = h.Stock[(int)Good.Grain] - GrainKeep(h); if (spare < 2) continue;
-                    float t = Math.Min(Math.Min(spare, q - got), buyer.Coin / unitPrice);
-                    h.Stock[(int)Good.Grain] -= t; got += t; buyer.Coin -= t * unitPrice;
-                    var seller = HeadOf(h); if (seller != null) seller.Coin += t * unitPrice;
+                    float t = s1.Key * frac; if (g == Good.Cloth || g == Good.Beasts) t = (float)Math.Floor(t + 0.001f);
+                    if (t <= 0.01f) continue;
+                    s1.Value(t); got += t; buyer.Coin -= t * unitPrice;
                 }
-                if (got < q && buyer.Coin >= unitPrice)
-                {
-                    float spare = domain < 0 ? CrownSpareGrain : Math.Max(0, StoresIn(domain).Sum(b => Avail(b, Good.Grain, false)) - 40);
-                    float t = Math.Min(Math.Min(spare, q - got), buyer.Coin / unitPrice);
-                    if (t > 0)
-                    {
-                        float taken = domain < 0 ? TakeFromStores(Good.Grain, t) : TakeFromAvail(StoresIn(domain), Good.Grain, t);
-                        got += taken; buyer.Coin -= taken * unitPrice;
-                        PayLord(domain, taken * unitPrice, "Grain sold to merchants");
-                    }
-                }
-                return got;
             }
-            foreach (var shop in Buildings.Where(b => b.Built && b.Def.IsShop && b.Def.Sells == g && DomainOf(b) == domain).ToList())
+            // the lord's granary sells last, and only from what's above his stockpile
+            if (g == Good.Grain && got < q && buyer.Coin >= unitPrice)
             {
-                if (got >= q || buyer.Coin < unitPrice) break;
-                float spare = Math.Max(0, shop.Stock[(int)g] - shop.Def.Cap * 0.3f);
-                float t = Math.Min(Math.Min(spare, q - got), buyer.Coin / unitPrice);
-                if (t <= 0.01f) continue;
-                shop.Stock[(int)g] -= t; got += t; buyer.Coin -= t * unitPrice;
-                Takings(shop, t * unitPrice);
+                float t = Math.Min(Math.Min(LordSpare(domain), q - got), buyer.Coin / unitPrice);
+                if (t > 0)
+                {
+                    float taken = domain < 0 ? TakeFromStores(Good.Grain, t) : TakeFromAvail(StoresIn(domain), Good.Grain, t);
+                    got += taken; buyer.Coin -= taken * unitPrice;
+                    PayLord(domain, taken * unitPrice, "Grain sold to merchants");
+                }
             }
             return got;
         }

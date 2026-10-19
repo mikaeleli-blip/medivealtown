@@ -113,7 +113,8 @@ namespace MedievalTown.Simulation
         public float FreeWage = 0.6f;      // a day's pay for freemen working for the crown
         public bool Dole = true;           // the granary feeds the hungry
         public bool SellSurplus = true;    // the merchant buys the granary's grain above the reserve
-        public float Reserve = 200f;       // grain the granary keeps back beyond the household's needs until harvest
+        public float Reserve = 200f;       // (no longer used: see FamineDays)
+        public float FamineDays = 10f;     // the famine store: days of grain for every crown family the royal granary keeps for bad years
         public bool BuyMaterials = true;   // buy timber and stone from the merchant for waiting building sites
         public float CoinReserve = 40f;    // coin the treasury won't spend on materials
         public bool Births = true;         // couples have children (the royal family always may)
