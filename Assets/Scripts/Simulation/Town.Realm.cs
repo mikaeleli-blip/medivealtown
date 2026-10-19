@@ -252,7 +252,7 @@ namespace MedievalTown.Simulation
             // what's in his chest goes to the crown
             if (manor != null) { Receive(manor.Coin, manor.ChestGrain); manor.Coin = 0; manor.ChestGrain = 0; }
             AddLog(Title(baron) + " was stripped of the barony" + (baron.Coin > 20 ? ", and of the " + Money(baron.Coin) + " he'd put by." : "."), LogKind.Crown);
-            Coin += baron.Coin * 0.5f;
+            Coin += baron.Coin * 0.5f; Book("Seized from barons", baron.Coin * 0.5f);
             People.Remove(baron);
             b.BaronId = -1; b.BaronDue = Day + Balance.StewardArrives; b.Rebel = false;
             foreach (var o in Baronies) if (o != b) o.Loyalty = Clamp(o.Loyalty - 15, 0, 100);
@@ -533,7 +533,7 @@ namespace MedievalTown.Simulation
 
         void Receive(float coin, float grain)
         {
-            Coin += coin; WeekIn += coin; PutInStores(Good.Grain, grain);
+            Coin += coin; WeekIn += coin; PutInStores(Good.Grain, grain); Book("Taxes", coin);
             Taxes.ReceivedCoin += coin; Taxes.ReceivedGrain += grain;
             WeekTaxCoin += coin; WeekTaxGrain += grain;
         }

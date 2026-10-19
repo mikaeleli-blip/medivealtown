@@ -65,7 +65,7 @@ The map is one big map. The capital (the village the king starts in) has its cro
 Each household owes:
 
 - a **harvest tax**: a share of its strip's grain, 30% by default (this is what feeds the court; there is no royal farm);
-- a **hearth tax** in coin each week, plus rent for freemen;
+- a **hearth tax** in coin each week (0.25c), plus rent for freemen (0.6c);
 - **tallage**, laid on serf families at Martinmas (start of winter).
 
 | Day | Who | What happens |
@@ -115,6 +115,17 @@ reeve collects it on Friday with the other taxes, so it climbs the same chain as
 - The Trades tab on the hotbar has them all. A shop's panel shows its takings, what it's short of and why it's idle.
 
 ![Trades](docs/trades.png)
+
+## The treasury
+
+- **Wages** are paid only for a day's real work: the woods and quarry stand idle (unpaid) when the stores hold what the
+  building sites still need. The **miller** isn't paid in coin at all: he keeps 40% of the multure in flour (the miller's
+  toll) and sells what his family can't eat on market day.
+- **The court's table:** the royal household buys meat, fish, bread and cloth from the village shops each day, while the
+  treasury is above its reserve. It's the main way the crown's coin goes back into the village.
+- **The granary** sells grain to the shops and freemen (0.3c), lets a baker or brewer with an empty purse have grain on
+  credit, and buys grain it's short of from its own serfs before the merchant. Freemen buy grain from serf families first.
+- **Freemen with no work and no coin** leave to seek work in the towns, rather than run up debts forever.
 
 ## The hierarchy
 

@@ -191,7 +191,8 @@ namespace MedievalTown.Simulation
             if (IsMarketDay) { BaronsCollect(); MarketDay(); }
             if (WeekdayIndex == 0) StewardCollects();
             if (WeekdayIndex == 1) StewardDelivers();
-            if (IsSunday) { Weekly(); Trees(); BaronMoods(); ReeveVacancies(false); }
+            if (IsSunday) { Weekly(); Trees(); BaronMoods(); ReeveVacancies(false); FreemenMoveOn(); }
+            CourtBuys();
             StewardArrives();
             CheckRevolt();
 
@@ -266,7 +267,7 @@ namespace MedievalTown.Simulation
             if (p.Rank == Rank.Freeman)
             {
                 float w = Math.Min(Policy.FreeWage, Math.Max(0, Coin));
-                Coin -= w; WeekOut += w; p.Coin += w;
+                Coin -= w; WeekOut += w; p.Coin += w; Book("Wages: building", -w);
             }
             // haul first, then build on what's here
             foreach (var g in new[] { Good.Timber, Good.Stone })
@@ -282,13 +283,11 @@ namespace MedievalTown.Simulation
             s.Progress = Math.Min(cap, s.Progress + 1f);
         }
 
-        /// <summary>A day at one of the crown's works (the woods and the quarry), for the crown's wage.</summary>
+        /// <summary>A day at one of the crown's works (the woods and the quarry), for the crown's wage, paid only for a day's real work.
+        /// The miller isn't paid in coin: he keeps his share of the multure (see Milling).</summary>
         void TradeWork(Building b, Citizen p)
         {
-            {
-                float w = Math.Min(Policy.FreeWage, Math.Max(0, Coin));
-                Coin -= w; WeekOut += w; p.Coin += w;
-            }
+            bool worked = false;
             switch (b.Type)
             {
                 case BuildingType.Woodcutter:
@@ -298,6 +297,7 @@ namespace MedievalTown.Simulation
                     {
                         if (b.TargetTile < 0 || TerrainAt(b.TargetTile % Cols, b.TargetTile / Cols) != Tile.Tree) b.TargetTile = NearestTile(b, Tile.Tree);
                         if (b.TargetTile < 0) break;
+                        worked = true;
                         b.ChopWork += Balance.TreeWork;
                         if (b.ChopWork >= 1f)
                         {
@@ -311,19 +311,26 @@ namespace MedievalTown.Simulation
                     {
                         float t = TakeFromStores(Good.Timber, Balance.SplitPerWorker);
                         PutInStores(Good.Firewood, t * Balance.FirewoodPerTimber);
+                        worked = t > 0;
                     }
                     break;
                 }
                 case BuildingType.Quarry:
                 {
-                    if (QuarryOnHill(b)) { PutInStores(Good.Stone, Balance.StonePerWorker); break; }
+                    if (QuarryOnHill(b)) { PutInStores(Good.Stone, Balance.StonePerWorker); worked = true; break; }
                     if (b.TargetTile < 0 || TerrainAt(b.TargetTile % Cols, b.TargetTile / Cols) != Tile.Rock) b.TargetTile = NearestTile(b, Tile.Rock);
                     if (b.TargetTile < 0) break;
+                    worked = true;
                     PutInStores(Good.Stone, Balance.StonePerWorker);
                     b.ChopWork += Balance.StonePerWorker / Balance.StonePerRock;
                     if (b.ChopWork >= 1f) { b.ChopWork = 0; SetTerrain(b.TargetTile % Cols, b.TargetTile / Cols, Tile.Grass); b.TargetTile = -1; }
                     break;
                 }
+            }
+            if (worked)
+            {
+                float w = Math.Min(Policy.FreeWage, Math.Max(0, Coin));
+                Coin -= w; WeekOut += w; p.Coin += w; Book("Wages: " + b.Def.Name, -w);
             }
         }
 
@@ -355,12 +362,20 @@ namespace MedievalTown.Simulation
             if (b.Def.IsShop) return ShopNeeded(b);
             switch (b.Type)
             {
+                // the crown's works only run when the stores are short of what the sites still need
                 case BuildingType.Quarry:
-                    return StoreStock(Good.Stone) < 30 || Sites.Any(x => x.Delivered[(int)Good.Stone] < x.Def.Stone) && StoreStock(Good.Stone) < 150;
+                    return StoreStock(Good.Stone) < SitesStillNeed(Good.Stone) + 30;
                 case BuildingType.Woodcutter:
-                    return StoreStock(Good.Timber) < 60 || StoreStock(Good.Firewood) < 80 || Sites.Any(x => x.Delivered[(int)Good.Timber] < x.Def.Timber) && StoreStock(Good.Timber) < 200;
+                    return StoreStock(Good.Timber) < SitesStillNeed(Good.Timber) + 40 || StoreStock(Good.Firewood) < 80;
                 default: return true;
             }
+        }
+
+        public float SitesStillNeed(Good g)
+        {
+            float n = 0;
+            foreach (var s in Buildings) if (!s.Built) n += Math.Max(0, (g == Good.Timber ? s.Def.Timber : s.Def.Stone) - s.Delivered[(int)g]);
+            return n;
         }
 
         int NearestTile(Building b, byte kind)
@@ -395,7 +410,7 @@ namespace MedievalTown.Simulation
                 h.Stock[(int)Good.Grain] -= q; cap -= q;
                 float share = q * multure;
                 h.Stock[(int)Good.Flour] += q - share;
-                PutInStores(Good.Flour, share);
+                PutInStores(Good.Flour, MillerTakes(share));
                 Today.Milled += q; Today.Multure += share;
             }
             // and the lord's own grain for the household
@@ -405,6 +420,17 @@ namespace MedievalTown.Simulation
                 float q = TakeFromStores(Good.Grain, Math.Min(lordNeed, Math.Min(cap, Math.Max(0, StoreStock(Good.Grain) - 20))));
                 PutInStores(Good.Flour, q); Today.Milled += q;
             }
+        }
+
+        /// <summary>The miller's toll: he keeps a share of the multure in flour for his family (his pay), the crown gets the rest.</summary>
+        float MillerTakes(float share)
+        {
+            var mill = WorkingMill; if (mill == null) return share;
+            var miller = GetCitizen(mill.Employees[0]); var home = HomeOf(miller);
+            if (home == null) return share;
+            float his = share * Balance.MillerShare;
+            home.Stock[(int)Good.Flour] += his;
+            return share - his;
         }
 
         /// <summary>Days until this year's harvest is in (or next year's, once autumn's well along).</summary>
@@ -420,7 +446,17 @@ namespace MedievalTown.Simulation
         /// <summary>Grain the granary must keep to feed the lord's household until the harvest is in.</summary>
         public float HouseholdKeep { get { return RoyalNeeds() / (WorkingMill != null ? 1f : Balance.GrainFeeds) * DaysUntilHarvest - StoreStock(Good.Flour); } }
         /// <summary>What the merchant may not buy: the household's keep plus the reserve the lord sets.</summary>
-        public float RoyalKeep { get { return Math.Max(0, HouseholdKeep) + Policy.Reserve; } }
+        public float RoyalKeep { get { return Math.Max(0, HouseholdKeep) + FreemenKeep + Policy.Reserve; } }
+        /// <summary>Grain the freemen will want to buy from the granary until the harvest (they have no strips of their own).</summary>
+        public float FreemenKeep
+        {
+            get
+            {
+                float n = 0;
+                foreach (var h in Buildings) { if (!h.Built || !IsPeasantHome(h.Type) || h.Residents.Count == 0) continue; var hd = HeadOf(h); if (hd != null && (hd.Rank == Rank.Freeman || hd.WasFree)) n += Needs(h); }
+                return n * DaysUntilHarvest / Balance.GrainFeeds * 0.3f;   // they buy much of it from serf families
+            }
+        }
 
         // ---- food
         public float Needs(Building home)
@@ -470,7 +506,12 @@ namespace MedievalTown.Simulation
         float EatFromStores(float need)
         {
             float got = 0;
-            float f = TakeFromStores(Good.Flour, need); got += f;
+            // the court's table: meat, fish and bread bought from the village shops first
+            got += TakeFromStores(Good.Meat, need / Balance.MeatFeeds) * Balance.MeatFeeds;
+            if (got < need) got += TakeFromStores(Good.Fish, (need - got) / Balance.FishFeeds) * Balance.FishFeeds;
+            if (got < need) got += TakeFromStores(Good.Bread, need - got);
+            if (got >= need) return got;
+            float f = TakeFromStores(Good.Flour, need - got); got += f;
             if (got < need) got += TakeFromStores(Good.Grain, (need - got) / Balance.GrainFeeds) * Balance.GrainFeeds;
             return got;
         }
@@ -568,7 +609,7 @@ namespace MedievalTown.Simulation
                 if (p.Coin > 0.3f) { float c = Math.Min(p.Coin, 0.05f); p.Coin -= c; plate += c; }
             }
             Today.AtMass = church.Attendance;
-            if (RulerIs(Trait.Pious) && Coin > 5) { float g = Math.Min(2, Coin * 0.05f); Coin -= g; WeekOut += g; plate += g; }
+            if (RulerIs(Trait.Pious) && Coin > 5) { float g = Math.Min(2, Coin * 0.05f); Coin -= g; WeekOut += g; plate += g; Book("Alms to the church", -g); }
             // the priest keeps the plate for the church's poor box: it buys grain for alms in a bad week
             if (plate > 0) { church.Stock[(int)Good.Grain] += plate / Balance.MerchantGrain * 0.5f; }
         }
@@ -591,7 +632,7 @@ namespace MedievalTown.Simulation
                 if (p.HomeId < 0) target -= 15;
                 if (p.Rank == Rank.Serf || p.Rank == Rank.Reeve) target -= Policy.WeekWork * 5 - 5;   // two days is custom; more is a burden
                 if (p.Rank == Rank.Freeman) target -= Math.Max(0, Policy.Rent - 0.6f) * 8;
-                target -= Math.Max(0, Policy.HarvestTax - 0.3f) * 60 + Math.Max(0, Policy.HearthTax - 0.1f) * 20;   // taxes above custom sting
+                target -= Math.Max(0, Policy.HarvestTax - 0.3f) * 60 + Math.Max(0, Policy.HearthTax - 0.25f) * 20;   // taxes above custom sting
                 var hh = HomeOf(p); if (hh != null && hh.Arrears > 0.5f) target -= 6;
                 target += (p.Piety - 40) * 0.2f;
                 if (Day - p.AleDay < 7) target += 4;
@@ -633,12 +674,19 @@ namespace MedievalTown.Simulation
             // the merchant buys households' surplus
             foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0))
             {
-                float keep = Needs(h) * (DaysUntilHarvest + 10) / Balance.GrainFeeds + 20;
-                float spare = h.Stock[(int)Good.Grain] + h.Stock[(int)Good.Flour] - keep;
-                if (spare < 10 || Season < 2) continue;
+                float spare = h.Stock[(int)Good.Grain] - GrainKeep(h);
+                if (spare < 10) continue;
                 float q = Math.Min(spare * 0.5f, h.Stock[(int)Good.Grain]);
                 h.Stock[(int)Good.Grain] -= q;
                 var head = HeadOf(h); if (head != null) head.Coin += q * price * 0.9f;
+            }
+            // the miller sells the flour his family can't eat
+            foreach (var mill in OfType(BuildingType.Mill).Where(m => m.Employees.Count > 0))
+            {
+                var miller = GetCitizen(mill.Employees[0]); var home = HomeOf(miller); if (home == null) continue;
+                float spare = home.Stock[(int)Good.Flour] - Needs(home) * 20;
+                if (spare < 5) continue;
+                home.Stock[(int)Good.Flour] -= spare; miller.Coin += spare * price * 1.2f;
             }
             // and the lord's grain above the reserve
             if (Policy.SellSurplus)
@@ -648,7 +696,7 @@ namespace MedievalTown.Simulation
                 {
                     float q = TakeFromStores(Good.Grain, spare);
                     float pay = q * price * (RulerIs(Trait.Greedy) ? 1.1f : 1f);
-                    Coin += pay; WeekIn += pay;
+                    Coin += pay; WeekIn += pay; Book("Grain sold to the merchant", pay);
                     AddLog("Market day: the merchant bought " + Math.Round(q) + " measures of the king's grain for " + Money(pay) + ".", LogKind.Info);
                 }
             }
@@ -661,7 +709,7 @@ namespace MedievalTown.Simulation
                     float q = Math.Min(Math.Min(need, 60f), (Coin - Policy.CoinReserve) / unit);
                     if (q < 2) continue;
                     q = (float)Math.Floor(q);
-                    Coin -= q * unit; WeekOut += q * unit; PutInStores(g, q);
+                    Coin -= q * unit; WeekOut += q * unit; PutInStores(g, q); Book("Bought " + Defs.GoodNames[(int)g].ToLower(), -q * unit);
                     AddLog("Market day: the crown bought " + q + " " + Defs.GoodNames[(int)g].ToLower() + " from the merchant for " + Money(q * unit) + ".", LogKind.Info);
                 }
             // freemen buy firewood from the lord's stores when their woodpile's low
@@ -673,24 +721,50 @@ namespace MedievalTown.Simulation
                 float q = Math.Min(want, Math.Min(payer.Coin / Balance.FirewoodPrice, Math.Max(0, StoreStock(Good.Firewood) - 40)));
                 if (q < 1) continue;
                 q = TakeFromStores(Good.Firewood, q);
-                payer.Coin -= q * Balance.FirewoodPrice; Coin += q * Balance.FirewoodPrice; WeekIn += q * Balance.FirewoodPrice;
+                payer.Coin -= q * Balance.FirewoodPrice; Coin += q * Balance.FirewoodPrice; WeekIn += q * Balance.FirewoodPrice; Book("Firewood sold to freemen", q * Balance.FirewoodPrice);
                 h.Stock[(int)Good.Firewood] += q;
             }
-            // the crown buys grain when the granary won't feed the court until harvest
+            // the crown buys grain when the granary won't feed the court until harvest: from its own villagers first, then the merchant
             {
                 float want = HouseholdKeep + 30 - StoreStock(Good.Grain);
+                foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0).ToList())
+                {
+                    if (want < 1 || Coin - Policy.CoinReserve * 0.5f < Balance.VillageGrain) break;
+                    float spare = h.Stock[(int)Good.Grain] - GrainKeep(h);
+                    if (spare < 3) continue;
+                    float bq = (float)Math.Floor(Math.Min(Math.Min(spare, want), (Coin - Policy.CoinReserve * 0.5f) / Balance.VillageGrain));
+                    if (bq < 1) continue;
+                    h.Stock[(int)Good.Grain] -= bq; PutInStores(Good.Grain, bq); want -= bq;
+                    float pay = bq * Balance.VillageGrain; Coin -= pay; WeekOut += pay; Book("Bought grain from villagers", -pay);
+                    var seller = HeadOf(h); if (seller != null) seller.Coin += pay;
+                }
                 float q = (float)Math.Floor(Math.Min(Math.Min(want, 120f), (Coin - Policy.CoinReserve * 0.5f) / Balance.BuyGrain));
                 if (q >= 5)
                 {
-                    Coin -= q * Balance.BuyGrain; WeekOut += q * Balance.BuyGrain; PutInStores(Good.Grain, q);
+                    Coin -= q * Balance.BuyGrain; WeekOut += q * Balance.BuyGrain; PutInStores(Good.Grain, q); Book("Bought grain", -q * Balance.BuyGrain);
                     AddLog("Market day: the crown bought " + q + " measures of grain from the merchant for " + Money(q * Balance.BuyGrain) + ".", LogKind.Info);
                 }
             }
-            // freemen (who have no strips, wherever they live) buy grain for the coming weeks
-            foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0))
+            // freemen (who have no strips, wherever they live) buy grain for the coming weeks: from serf families with grain to spare,
+            // then from the king's granary
+            var sellers = Buildings.Where(b => b.Built && b.Type == BuildingType.Cottage && b.Residents.Count > 0).ToList();
+            foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0).ToList())
             {
                 var head = HeadOf(h); if (head == null || (head.Rank != Rank.Freeman && !head.WasFree)) continue;
                 float want = Needs(h) * 21f - h.Stock[(int)Good.Grain] - h.Stock[(int)Good.Flour] - h.Stock[(int)Good.Bread] * 1.4f;
+                if (want < 5) continue;
+                var buyers = Purse(h);
+                foreach (var s in sellers.OrderBy(x => Dist2(x, h)))
+                {
+                    if (want < 1) break;
+                    float spare = s.Stock[(int)Good.Grain] - GrainKeep(s);
+                    if (spare < 3) continue;
+                    float q2 = Math.Min(Math.Min(spare, want), CoinOf(buyers) / Balance.VillageGrain);
+                    if (q2 < 1) break;
+                    float v = q2 * Balance.VillageGrain;
+                    s.Stock[(int)Good.Grain] -= q2; h.Stock[(int)Good.Grain] += q2; want -= q2;
+                    Pay(buyers, v); var sh = HeadOf(s); if (sh != null) sh.Coin += v;
+                }
                 if (want < 5) continue;
                 float purse = h.Residents.Select(GetCitizen).Where(p => p != null).Sum(p => p.Coin);
                 float q = Math.Min(want, Math.Min(purse / Math.Max(0.01f, Policy.GrainPrice), StoreStock(Good.Grain)));
@@ -698,7 +772,7 @@ namespace MedievalTown.Simulation
                 q = TakeFromStores(Good.Grain, q);
                 float pay = q * Policy.GrainPrice;
                 foreach (var p in h.Residents.Select(GetCitizen).Where(p => p != null).OrderByDescending(p => p.Coin)) { float t = Math.Min(p.Coin, pay); p.Coin -= t; pay -= t; if (pay <= 0) break; }
-                Coin += q * Policy.GrainPrice; WeekIn += q * Policy.GrainPrice;
+                Coin += q * Policy.GrainPrice; WeekIn += q * Policy.GrainPrice; Book("Grain sold to freemen", q * Policy.GrainPrice);
                 h.Stock[(int)Good.Grain] += q;
             }
         }

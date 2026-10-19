@@ -102,14 +102,14 @@ namespace MedievalTown.Simulation
     {
         public int WeekWork = 2;           // days a week each serf owes on the king's land
         public float HarvestTax = 0.3f;    // share of every strip's harvest owed in grain
-        public float HearthTax = 0.1f;     // coin per household per week
+        public float HearthTax = 0.25f;     // coin per household per week
         public float Rent = 0.6f;          // coin per freeman household per week, on top of the hearth tax
         public float Tallage = 1f;         // coin per serf household, assessed at Martinmas (start of winter)
         public float ReeveCut = 0.05f;     // the reeve's share of what he collects
         public float BaronCut = 0.15f;     // a baron's share of what his collector brings in
         public float StewardCut = 0.1f;    // the steward's share of what he takes on to the castle
         public float Multure = 0.08f;      // the crown's share of every sack ground at the mill
-        public float GrainPrice = 0.2f;    // what freemen pay for a measure of the king's grain
+        public float GrainPrice = 0.3f;     // what freemen pay for a measure of the king's grain
         public float FreeWage = 0.6f;      // a day's pay for freemen working for the crown
         public bool Dole = true;           // the granary feeds the hungry
         public bool SellSurplus = true;    // the merchant buys the granary's grain above the reserve

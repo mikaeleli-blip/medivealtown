@@ -86,7 +86,8 @@ namespace MedievalTown.Simulation
         public const float TreeWork = 0.5f;        // two worker-days to fell a tree
         public const int TimberPerTree = 6;
         public const float SplitPerWorker = 2f, FirewoodPerTimber = 4f;
-        public const float StonePerWorker = 2.2f;
+        public const float StonePerWorker = 3.2f;
+        public const float MillerShare = 0.4f;     // the miller's toll: his part of the multure, which is his pay
         public const int StonePerRock = 6;
         public const float MillPerDay = 140f;      // grain a miller grinds in a day
         public const float BrewPerWorker = 6f;     // ale per worker-day, from half as much grain
@@ -145,7 +146,7 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Road, Category = Category.Roads, Name = "Track", Blurb = "A beaten earth track. People walk faster on it.", W = 1, H = 1, Color = "#c4a878" });
             Add(new BuildingDef { Type = BuildingType.Cottage, Category = Category.Homes, Name = "Cottage", Blurb = "Wattle, daub and thatch on a cruck frame, with a toft garden behind. Houses one serf family.", W = 2, H = 3, Timber = 10, Work = 6, IsHome = true, Beds = Balance.HouseholdMax, Color = "#c8a050" });
             Add(new BuildingDef { Type = BuildingType.FreeHouse, Category = Category.Homes, Name = "Freeman's House", Blurb = "A timber-framed house on a stone sill. Freemen pay rent in coin instead of labour.", W = 2, H = 3, Timber = 16, Stone = 4, Work = 9, IsHome = true, Beds = Balance.HouseholdMax, Color = "#e8dcc4" });
-            Add(new BuildingDef { Type = BuildingType.Keep, Category = Category.Crown, Name = "Castle", Blurb = "The king's stone keep and great hall. Court is held here, and the taxes end up in its treasury. Until it stands the royal family lives in a pavilion.", W = 7, H = 6, Timber = 40, Stone = 120, Work = 60, Unique = true, IsHome = true, Beds = 12, Color = "#8d877d" });
+            Add(new BuildingDef { Type = BuildingType.Keep, Category = Category.Crown, Name = "Castle", Blurb = "The king's stone keep and great hall. Court is held here, and the taxes end up in its treasury. Until it stands the royal family lives in a pavilion.", W = 7, H = 6, Timber = 40, Stone = 100, Work = 60, Unique = true, IsHome = true, Beds = 12, Color = "#8d877d" });
             Add(new BuildingDef { Type = BuildingType.Church, Category = Category.Church, Name = "Parish Church", Blurb = "Stone nave and bell tower. The priest says mass on Sundays and takes a tenth of every harvest.", W = 3, H = 4, Timber = 20, Stone = 50, Work = 30, Unique = true, Beds = 1, Color = "#e8e2d4" });
             Add(new BuildingDef { Type = BuildingType.Granary, Category = Category.Crown, Name = "Royal Granary", Blurb = "The king's barn and stores: grain, flour, firewood, timber and stone. The grain taxes end up here.", W = 3, H = 2, Timber = 24, Stone = 6, Work = 10, IsStorage = true, Color = "#b5432f" });
             Add(new BuildingDef { Type = BuildingType.Strip, Category = Category.Fields, Name = "Strip Field", Blurb = "A serf family's strips in the open field. They work it on the days they don't owe the king, and give part of the harvest in tax.", W = 5, H = 4, Work = 3, IsField = true, Color = "#a08452" });

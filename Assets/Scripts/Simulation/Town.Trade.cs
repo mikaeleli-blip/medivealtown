@@ -33,13 +33,71 @@ namespace MedievalTown.Simulation
             // a shop that owes its supplier pays back from its takings first
             float repay = 0;
             var creditor = GetBuilding(shop.DebtTo);
-            if (shop.Debt > 0.001f && creditor != null && creditor != shop) { repay = Math.Min(shop.Debt, value * 0.6f); shop.Debt -= repay; Takings(creditor, repay); }
+            if (shop.Debt > 0.001f && shop.DebtTo == CrownCredit) { repay = Math.Min(shop.Debt, value * 0.6f); shop.Debt -= repay; Coin += repay; WeekIn += repay; Book("Grain sold to shops", repay); }
+            else if (shop.Debt > 0.001f && creditor != null && creditor != shop) { repay = Math.Min(shop.Debt, value * 0.6f); shop.Debt -= repay; Takings(creditor, repay); }
             else if (creditor == null) shop.Debt = 0;
+            if (shop.Debt < 0.001f) shop.DebtTo = -1;
             Share(staff, value - repay);
             shop.WeekSales += value;
             float toll = value * Policy.MarketToll * (RulerIs(Trait.Greedy) ? 1.3f : 1f);
             var home = staff.Count > 0 ? HomeOf(staff[0]) : null;
             if (toll > 0 && home != null && home.VillageId >= 0) { Assess(home, toll, 0); Taxes.Tolls += toll; }
+        }
+
+        const int CrownCredit = -2;   // a shop's debt is to the king's granary
+
+        /// <summary>The royal household keeps a good table: each day the steward buys meat, fish and bread for the court from the
+        /// village shops, and cloth for the household now and then. It's how much of the crown's coin finds its way back to the village.</summary>
+        void CourtBuys()
+        {
+            if (Coin < Policy.CoinReserve) return;
+            var seat = Seat; if (seat == null) return;
+            int court = People.Count(p => RoyalHousehold(p));
+            float budget = Math.Min(Coin - Policy.CoinReserve, 0.15f * court + 0.5f);
+            foreach (var want in new[] { (BuildingType.Butcher, Good.Meat, court * 0.4f), (BuildingType.Fishpond, Good.Fish, court * 0.3f), (BuildingType.Bakehouse, Good.Bread, court * 0.5f) })
+            {
+                if (StoreStock(want.Item2) >= want.Item3 * 2) continue;
+                var shop = Shops(want.Item1).Where(s => s.Stock[(int)want.Item2] >= 1).OrderBy(s => Dist2(s, seat)).FirstOrDefault();
+                if (shop == null) continue;
+                float q = Math.Min(Math.Min(want.Item3, shop.Stock[(int)want.Item2]), budget / shop.Def.Price);
+                if (q < 0.5f) continue;
+                float v = q * shop.Def.Price;
+                shop.Stock[(int)want.Item2] -= q; PutInStores(want.Item2, q);
+                Coin -= v; WeekOut += v; budget -= v; Book("The court's table", -v);
+                Takings(shop, v);
+            }
+            if (IsMarketDay && StoreStock(Good.Cloth) < court * 0.5f)
+            {
+                var shop = Shops(BuildingType.Weaver).Where(s => s.Stock[(int)Good.Cloth] >= 1).FirstOrDefault();
+                if (shop != null && Coin - Policy.CoinReserve > shop.Def.Price)
+                {
+                    shop.Stock[(int)Good.Cloth] -= 1; PutInStores(Good.Cloth, 1);
+                    Coin -= shop.Def.Price; WeekOut += shop.Def.Price; Book("Cloth for the household", -shop.Def.Price);
+                    Takings(shop, shop.Def.Price);
+                }
+            }
+            // the household wears out its clothes too
+            TakeFromStores(Good.Cloth, court * Balance.ClothWear / Balance.DaysPerYearF);
+        }
+
+        /// <summary>A freeman family with no coin, nothing owed them and no paid work goes off to look for work in the towns.</summary>
+        void FreemenMoveOn()
+        {
+            foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0).ToList())
+            {
+                var head = HeadOf(h); if (head == null || head.Rank != Rank.Freeman) continue;
+                var folk = h.Residents.Select(GetCitizen).Where(p => p != null).ToList();
+                if (folk.Any(p => p.Rank != Rank.Freeman)) continue;
+                if (CoinOf(folk) > 0.5f || h.Arrears < 2f) continue;
+                var w = GetBuilding(head.WorkId);
+                if (w != null && (w.Def.IsShop ? w.LastSales > 2f : TradeNeeded(w))) continue;
+                if (!Chance(0.5)) continue;
+                AddLog("The " + head.Family + " family, freemen with no work and no coin, left " + (VillageOf(h) != null ? VillageOf(h).Name : ManorName) + " to seek work in the towns.", LogKind.Bad);
+                foreach (var p in folk) { var partner = GetCitizen(p.PartnerId); if (partner != null && !folk.Contains(partner)) partner.PartnerId = -1; People.Remove(p); Fled++; }
+                h.OwedCoin = 0; h.Arrears = 0;
+                Rehouse(); AssignStrips(); Hire();
+                return;
+            }
         }
 
         /// <summary>Coin a household can spend: what it has, less what it owes the reeve and a little put by.</summary>
@@ -93,7 +151,7 @@ namespace MedievalTown.Simulation
                     float q = Math.Min(s[(int)Good.Grain], Balance.BakePerWorker * hands);
                     if (q <= 0 || WorkingMill == null) break;
                     float multure = q * Policy.Multure * (RulerIs(Trait.Greedy) ? 1.5f : 1f);
-                    s[(int)Good.Grain] -= q; PutInStores(Good.Flour, multure); Today.Multure += multure; Today.Milled += q;
+                    s[(int)Good.Grain] -= q; PutInStores(Good.Flour, MillerTakes(multure)); Today.Multure += multure; Today.Milled += q;
                     s[(int)Good.Bread] += q - multure;
                     break;
                 }
@@ -156,11 +214,18 @@ namespace MedievalTown.Simulation
                         Pay(staff, v);
                         var seller = Purse(h); Share(seller.Take(1).ToList(), v);
                     }
-                    // the king's granary sells what it can spare
-                    if (want >= 1 && purse >= Policy.GrainPrice)
+                    // the king's granary sells what it can spare, and lets a shop with an empty purse have some on credit
+                    float credit = b.DebtTo < 0 || b.DebtTo == CrownCredit ? Math.Max(0, Balance.CreditLimit - b.Debt) : 0;
+                    if (want >= 1 && purse + credit >= Policy.GrainPrice)
                     {
-                        float q = Math.Min(want, Math.Min(purse / Math.Max(0.01f, Policy.GrainPrice), Math.Max(0, StoreStock(Good.Grain) - RoyalKeep * 0.5f)));
-                        if (q >= 1) { q = TakeFromStores(Good.Grain, q); float v = q * Policy.GrainPrice; Pay(staff, v); Coin += v; WeekIn += v; b.Stock[(int)Good.Grain] += q; }
+                        float q = Math.Min(want, Math.Min((purse + credit) / Math.Max(0.01f, Policy.GrainPrice), Math.Max(0, StoreStock(Good.Grain) - RoyalKeep * 0.5f)));
+                        if (q >= 1)
+                        {
+                            q = TakeFromStores(Good.Grain, q); float v = q * Policy.GrainPrice, cash = Math.Min(v, purse), owed = v - cash;
+                            if (cash > 0) { Pay(staff, cash); Coin += cash; WeekIn += cash; Book("Grain sold to shops", cash); }
+                            if (owed > 0) { b.Debt += owed; b.DebtTo = CrownCredit; }
+                            b.Stock[(int)Good.Grain] += q;
+                        }
                     }
                 }
                 else
@@ -187,7 +252,8 @@ namespace MedievalTown.Simulation
         }
 
         /// <summary>Grain a household holds back: enough to see it to the harvest, and seed for a little more.</summary>
-        float GrainKeep(Building h) { return Needs(h) * (DaysUntilHarvest + 10) / Balance.GrainFeeds + 20 - h.Stock[(int)Good.Flour]; }
+        /// <summary>Grain a household holds back: enough to eat (mostly ground into flour, with the garden in summer) until the harvest, and a little over.</summary>
+        float GrainKeep(Building h) { return Needs(h) * (DaysUntilHarvest + 7) * 0.9f + 15 - h.Stock[(int)Good.Flour] - h.Stock[(int)Good.Bread]; }
 
         /// <summary>Each day some households go to the shops: bread (freemen, who have no strips, live on it), meat and fish now
         /// and then, cloth before winter. They spend what they can spare after what they owe the reeve.</summary>

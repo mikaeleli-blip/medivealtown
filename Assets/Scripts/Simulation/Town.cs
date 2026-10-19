@@ -41,6 +41,9 @@ namespace MedievalTown.Simulation
         public float WeekIn, WeekOut, LastIn, LastOut;
 
         // ---- runtime only ----
+        /// <summary>Where the treasury's coin came from and went, since the game was loaded.</summary>
+        [NonSerialized] public Dictionary<string, float> Ledger = new Dictionary<string, float>();
+        void Book(string what, float amount) { if (Ledger == null) Ledger = new Dictionary<string, float>(); float v; Ledger.TryGetValue(what, out v); Ledger[what] = v + amount; }
         [NonSerialized] Random rng;
         [NonSerialized] int[] occ;
         [NonSerialized] bool occDirty = true;

@@ -76,7 +76,7 @@ namespace MedievalTown.Simulation
             if (!k.Female) bride.Family = k.Family;
             bride.HomeId = Seat != null ? Seat.Id : -1;
             float dowry = 15 + Rng.Next(0, 16);
-            Coin += dowry; WeekIn += dowry;
+            Coin += dowry; WeekIn += dowry; Book("Dowry", dowry);
             Crown.SuitorDay = -1;
             AddLog(Title(k) + " married " + bride.First + " of the house of " + house + ", who brought a dowry of " + Money(dowry) + ".", LogKind.Crown);
             Rehouse();

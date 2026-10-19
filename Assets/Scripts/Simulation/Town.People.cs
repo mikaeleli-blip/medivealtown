@@ -254,7 +254,7 @@ namespace MedievalTown.Simulation
                 if (m.Rank == Rank.Freeman) w.Rank = Rank.Freeman; else if (w.Rank == Rank.Freeman) w.Rank = Rank.Serf;
                 float merchet = m.Rank == Rank.Freeman ? 0f : Math.Min(0.5f, m.Coin + w.Coin);
                 float fromM = Math.Min(m.Coin, merchet); m.Coin -= fromM; w.Coin -= merchet - fromM;
-                Coin += merchet; WeekIn += merchet;
+                Coin += merchet; WeekIn += merchet; Book("Merchet (marriage fines)", merchet);
                 AddLog(m.Name + " and " + w.First + " were married" + (Church != null ? " at the church door" : "") + (merchet > 0 ? ". The crown took " + Money(merchet) + " merchet." : "."), LogKind.Good);
             }
             Rehouse();
