@@ -43,6 +43,8 @@ namespace MedievalTown.Simulation
         // ---- runtime only ----
         /// <summary>Where the treasury's coin came from and went, since the game was loaded.</summary>
         [NonSerialized] public Dictionary<string, float> Ledger = new Dictionary<string, float>();
+        [NonSerialized] public Dictionary<string, float> TradeTally = new Dictionary<string, float>();
+        void Tally(string what, float q) { if (TradeTally == null) TradeTally = new Dictionary<string, float>(); float v; TradeTally.TryGetValue(what, out v); TradeTally[what] = v + q; }
         void Book(string what, float amount) { if (Ledger == null) Ledger = new Dictionary<string, float>(); float v; Ledger.TryGetValue(what, out v); Ledger[what] = v + amount; }
         [NonSerialized] Random rng;
         [NonSerialized] int[] occ;
@@ -387,6 +389,9 @@ namespace MedievalTown.Simulation
                     break;
                 case BuildingType.BoundaryStone:
                     StoneSet(b);
+                    break;
+                case BuildingType.MerchantHouse:
+                    MerchantSetsUp(b);
                     break;
                 case BuildingType.Church:
                     AddLog("The bishop consecrated " + ChurchName + ". There will be mass on Sundays.", LogKind.Church);

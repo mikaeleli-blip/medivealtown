@@ -114,6 +114,18 @@ namespace MedievalTown.Simulation
                 var near = VillageAt(x + 1, y + 1, 6);
                 if (near != null) return "Too close to " + near.Name + ". A new village needs room for its own land";
             }
+            if (type == BuildingType.VillageBarn)
+            {
+                var v = VillageAt(x + d.W / 2, y + d.H / 2);
+                if (v == null) return "A village barn has to be built in a village";
+                if (v.Capital) return "The capital keeps its goods in the Royal Granary";
+            }
+            if (type == BuildingType.MerchantHouse)
+            {
+                var v = VillageAt(x + d.W / 2, y + d.H / 2);
+                if (v == null || v.BaronyId < 0) return "A merchant's house belongs in a barony. He trades its goods with the capital";
+                if (Buildings.Any(b => b.Type == BuildingType.MerchantHouse && DomainOf(b) == v.BaronyId)) return DomainName(v.BaronyId) + " already has a merchant";
+            }
             if (type == BuildingType.BoundaryStone && VillageAt(x, y) == null) return "A boundary stone has to stand on a village's land, to push its bounds further";
             if (type == BuildingType.Manor)
             {
@@ -482,11 +494,12 @@ namespace MedievalTown.Simulation
                 // the baron's share: the custom, and what his honesty lets him add
                 float skim = baron == null ? 0 : Math.Max(0, 0.6f - baron.Honesty) / 0.6f * Balance.SkimMax;
                 float cut = baron == null ? 0 : Policy.BaronCut + skim;
-                float bc = coin * cut, bg = grain * cut;
+                // the grain stays in the barony: it goes into the baron's granary at the manor, and only coin goes on to the crown
+                float bc = coin * cut;
                 if (baron != null) baron.Coin += bc;
-                manor.Stock[(int)Good.Grain] += bg;
-                Taxes.BaronCutCoin += bc; Taxes.BaronCutGrain += bg;
-                manor.Coin += coin - bc; manor.ChestGrain += grain - bg;
+                manor.Stock[(int)Good.Grain] += grain;
+                Taxes.BaronCutCoin += bc; Taxes.BaronCutGrain += grain;
+                manor.Coin += coin - bc;
             }
         }
 
@@ -508,9 +521,9 @@ namespace MedievalTown.Simulation
             foreach (var b in Baronies)
             {
                 var manor = GetBuilding(b.ManorId); if (manor == null) continue;
-                if (b.Rebel) { Taxes.Withheld += manor.Coin + manor.ChestGrain * Balance.MerchantGrain; continue; }
-                b.LastCoin = manor.Coin; b.LastGrain = manor.ChestGrain;
-                chest.Coin += manor.Coin; chest.ChestGrain += manor.ChestGrain; manor.Coin = 0; manor.ChestGrain = 0;
+                if (b.Rebel) { Taxes.Withheld += manor.Coin; continue; }
+                b.LastCoin = manor.Coin; b.LastGrain = 0;
+                chest.Coin += manor.Coin; manor.Coin = 0;
             }
         }
 

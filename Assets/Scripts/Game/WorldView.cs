@@ -634,7 +634,7 @@ namespace MedievalTown.Game
                         case BuildingType.Quarry:
                             j.Spot = new Vector2(t.X * 16 + 10 + (p.Id % 3) * 6, t.Y * 16 + 16 + (p.Id % 2) * 2); j.Dir = PeopleArt.Up; j.Act = PeopleArt.Act.Pick;
                             return j;
-                        case BuildingType.Mill: case BuildingType.Alehouse:
+                        case BuildingType.Mill: case BuildingType.Alehouse: case BuildingType.MerchantHouse:
                             j.Inside = true; return j;
                         case BuildingType.Pasture: case BuildingType.Sheepfold:
                         {
@@ -663,6 +663,23 @@ namespace MedievalTown.Game
                             return j;
                         }
                     }
+                    break;
+                case Chore.Travel:
+                {
+                    // the merchant on the road with his cart: out to the capital on Tuesday, home on Thursday
+                    var capX = town.CrossOf(town.Capital); if (t == null || capX == null) break;
+                    var home = new Vector2(t.X * 16 + t.Def.W * 8, (t.Y + t.Def.H) * 16 + 6);
+                    var market = new Vector2(capX.X * 16 + 16 + (p.Seed - 0.5f) * 12, (capX.Y + 2) * 16 + 8);
+                    float k = Mathf.Clamp01((ph - 0.25f) / 0.5f);
+                    bool outward = town.WeekdayIndex == 1;
+                    if (outward ? k >= 1f : k <= 0f) { j.Spot = outward ? market : home; return j; }
+                    j.Spot = Vector2.Lerp(outward ? home : market, outward ? market : home, k);
+                    j.Carry = PropArt.CarriedSack();
+                    return j;
+                }
+                case Chore.Market:
+                    // trading at the capital's market, by the cross
+                    if (t != null) { j.Spot = new Vector2(t.X * 16 + 16 + (p.Seed - 0.5f) * 14, (t.Y + 2) * 16 + 8); j.Dir = PeopleArt.Down; j.Act = PeopleArt.Act.Point; return j; }
                     break;
                 case Chore.Mass: case Chore.Pray: case Chore.Court: case Chore.Accounts:
                     if (t != null) { j.Inside = true; return j; }

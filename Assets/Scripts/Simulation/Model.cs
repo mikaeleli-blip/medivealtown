@@ -155,6 +155,11 @@ namespace MedievalTown.Simulation
         public int Founded;
         public int GrumbleDay = -999;
         public float LastCoin, LastGrain;  // what the reeve brought in last week
+        public float[] Wants = new float[Balance.GoodCount];   // what its families wanted this week and couldn't buy anywhere in the barony
+        public int PetitionDay = -1;       // a petition to the king for grain, sent on this day and not yet answered
+        public float PetitionGrain;        // how much they asked for
+        public int LastPetition = -999;
+        public string MerchantNote;        // what the barony's merchant did last
     }
 
     /// <summary>A barony: a baron in his manor, ruling some villages for the king, with his own tax collector.</summary>

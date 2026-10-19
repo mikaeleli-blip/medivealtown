@@ -212,6 +212,7 @@ namespace MedievalTown.Game
             if (T.Sites.Any(s => s.MaterialsFraction < 1 && s.Progress >= s.MaterialsFraction * s.Def.Work - 0.5f) && T.StoreStock(Good.Timber) < 1 && T.StoreStock(Good.Stone) < 1)
                 lines.Add(new KeyValuePair<string, bool>("Building sites are waiting on timber and stone.", false));
             if (T.Priest == null) lines.Add(new KeyValuePair<string, bool>("The parish has no priest.", false));
+            foreach (var pv in T.PendingPetitions) lines.Add(new KeyValuePair<string, bool>(pv.Name + " begs the king for grain. Answer in the Court book or at its cross.", true));
             if (si >= 2)
             {
                 int rags = T.Buildings.Count(b => b.Built && b.Residents.Count > 0 && T.Ragged(b));
@@ -543,6 +544,12 @@ namespace MedievalTown.Game
 
         void CourtTab()
         {
+            var pleas = T.PendingPetitions.ToList();
+            if (pleas.Count > 0)
+            {
+                Heading("Petitions");
+                foreach (var v in pleas) PetitionBlock(v);
+            }
             Heading("The house of " + T.Dynasty);
             var king = T.King;
             PersonLine(king, king != null && king.Female ? "Queen" : "King");
@@ -623,6 +630,16 @@ namespace MedievalTown.Game
         float confirmDismissUntil;
         int confirmStrip = -1; float confirmStripUntil;
 
+        void PetitionBlock(Village v)
+        {
+            Para("The reeve of " + v.Name + " begs " + Mathf.RoundToInt(v.PetitionGrain) + " measures of grain to see the village to the harvest. " + Mathf.Max(0, Balance.PetitionDays - (T.Day - v.PetitionDay)) + " days to answer.", Ui.Bad);
+            Row("In the royal granary", Mathf.FloorToInt(T.StoreStock(Good.Grain)) + " grain");
+            float half = (bw - 4) / 2;
+            if (Ui.Button(new Rect(bx, by, half, 14), "Send the grain")) { var vv = v; Later(() => T.GrantPetition(vv)); }
+            if (Ui.Button(new Rect(bx + half + 4, by, half, 14), "Refuse")) { var vv = v; Later(() => T.RefusePetition(vv)); }
+            by += 18;
+        }
+
         void VillageBlock(Village v)
         {
             var rr = new Rect(bx, by - 1, bw, 11);
@@ -675,7 +692,7 @@ namespace MedievalTown.Game
             if (t.Tolls > 0.01f) Row("  of which market tolls", M(t.Tolls), Ui.InkSoft);
             Row("Reeve kept", M(t.ReeveCutCoin) + " · " + Mathf.FloorToInt(t.ReeveCutGrain) + " grain");
             Row("Reeves handed on", M(t.CollectedCoin) + " · " + Mathf.FloorToInt(t.CollectedGrain) + " grain");
-            if (t.BaronCutCoin + t.BaronCutGrain > 0.01f) Row("Barons kept", M(t.BaronCutCoin) + " · " + Mathf.FloorToInt(t.BaronCutGrain) + " grain");
+            if (t.BaronCutCoin + t.BaronCutGrain > 0.01f) Row("Barons kept", M(t.BaronCutCoin) + " · " + Mathf.FloorToInt(t.BaronCutGrain) + " grain (it stays in the barony)");
             if (t.Withheld > 0.05f) Row("Withheld by rebels", M(t.Withheld), Ui.Bad);
             float share = T.Policy.StewardCut;
             float handed = t.ReceivedCoin + t.StewardCutCoin + (t.ReceivedGrain + t.StewardCutGrain) * Balance.MerchantGrain, kept = t.StewardCutCoin + t.StewardCutGrain * Balance.MerchantGrain;
@@ -930,19 +947,21 @@ namespace MedievalTown.Game
                     if (b.Type == BuildingType.Quarry) Row("Stone", T.QuarryOnHill(b) ? "a hillside face" : T.RocksNear(b) + " boulders in reach");
                     if (b.Employees.Count > 0 && !T.TradeNeeded(b)) Para("Idle: the stores are full and nothing waits on it.");
                 }
-                if (b.Type == BuildingType.Granary || b.Type == BuildingType.Cart || Town.IsPeasantHome(b.Type) || b.Type == BuildingType.Church || d.IsShop || b.Type == BuildingType.StewardHall || b.Type == BuildingType.Manor)
+                if (b.Type == BuildingType.Granary || b.Type == BuildingType.Cart || Town.IsPeasantHome(b.Type) || b.Type == BuildingType.Church || d.IsShop || b.Type == BuildingType.StewardHall || b.Type == BuildingType.Manor || b.Type == BuildingType.VillageBarn || b.Type == BuildingType.MerchantHouse)
                 {
                     bool any = false;
                     for (int g = 0; g < Balance.GoodCount; g++)
                     {
                         if (b.Stock[g] < 0.5f) continue;
-                        if (!any) { Heading(b.Type == BuildingType.Church ? "Tithe barn" : Town.IsPeasantHome(b.Type) ? "Pantry and woodpile" : d.IsShop ? "In the shop" : "Stores"); any = true; }
+                        if (!any) { Heading(b.Type == BuildingType.Church ? "Tithe barn" : Town.IsPeasantHome(b.Type) ? "Pantry and woodpile" : d.IsShop ? "In the shop" : b.Type == BuildingType.MerchantHouse ? "On the cart" : b.Type == BuildingType.Manor ? "The baron's granary" : "Stores"); any = true; }
                         Row(Defs.GoodNames[g], Mathf.FloorToInt(b.Stock[g]).ToString());
                     }
                 }
                 if (b.Type == BuildingType.VillageCross && vil != null) CrossPanel(b, vil);
                 if (b.Type == BuildingType.Manor) ManorPanel(b);
-                if (b.Coin > 0.01f || b.ChestGrain > 0.5f) Row("Tax chest", M(b.Coin) + " · " + Mathf.FloorToInt(b.ChestGrain) + " grain");
+                if (b.Type == BuildingType.MerchantHouse) MerchantPanel(b);
+                if (b.Type == BuildingType.MerchantHouse) Row("Trading purse", M(b.Coin));
+                else if (b.Coin > 0.01f || b.ChestGrain > 0.5f) Row("Tax chest", M(b.Coin) + " · " + Mathf.FloorToInt(b.ChestGrain) + " grain");
                 if (Town.IsPeasantHome(b.Type) && (b.OwedCoin > 0.01f || b.OwedGrain > 0.5f)) Row("Owes the reeve", M(b.OwedCoin) + " · " + Mathf.FloorToInt(b.OwedGrain) + " grain", b.Arrears > 0.5f ? Ui.Bad : Ui.Ink);
                 if (b.Type == BuildingType.Mill) Row("Ground today", Mathf.FloorToInt(T.Today != null ? T.Today.Milled : 0) + " grain");
                 if (b.Type == BuildingType.Church) { Row("At mass last Sunday", b.Attendance.ToString()); Row("Graves", b.Graves.ToString()); }
@@ -985,6 +1004,16 @@ namespace MedievalTown.Game
             PersonLine(T.ReeveOf(v), "Reeve");
             Row("Answers to", T.LiegeName(v));
             Row("Last week", M(v.LastCoin) + " · " + Mathf.FloorToInt(v.LastGrain) + " grain");
+            Row("Its stores", v.Capital ? "the Royal Granary" : T.BarnsOf(v).Any() ? "its village barn" : (v.BaronyId >= 0 ? "the baron's granary (no barn)" : "the royal granary (no barn)"), v.Capital || T.BarnsOf(v).Any() ? Ui.Ink : Ui.Warn);
+            float days = T.GrainDays(v);
+            Row("Grain in hand", days > 90 ? "plenty" : Mathf.FloorToInt(days) + " days", days < 7 ? Ui.Bad : days < 14 ? Ui.Warn : Ui.Ink);
+            if (v.Wants != null)
+            {
+                var short_ = Enumerable.Range(0, Balance.GoodCount).Where(g => v.Wants[g] >= 1).OrderByDescending(g => v.Wants[g] * Town.PriceOf((Good)g)).Select(g => Defs.GoodNames[g].ToLower()).Take(4).ToArray();
+                if (short_.Length > 0) Row("Short of", string.Join(", ", short_), Ui.Warn);
+            }
+            if (!string.IsNullOrEmpty(v.MerchantNote)) Para(v.MerchantNote);
+            if (v.PetitionDay >= 0) PetitionBlock(v);
             bool seat = T.Baronies.Any(x => x.SeatVillageId == v.Id);
             if (!v.Capital && !seat && T.Baronies.Count > 0)
             {
@@ -1000,6 +1029,19 @@ namespace MedievalTown.Game
             if (v.Capital) Para("The capital's chest is fetched by the steward on Monday.");
             else if (v.BaronyId >= 0) Para("Every Saturday the baron's collector empties this chest and takes it to the manor.");
             else Para("The steward's collector empties this chest on Monday and takes it to the Steward's Hall.");
+        }
+
+        void MerchantPanel(Building b)
+        {
+            var m = T.MerchantOf(b);
+            if (m == null) { Para("No merchant has taken it up yet. He'll come when there's a house for his family.", Ui.Warn); return; }
+            FamilyLine(m, "Merchant");
+            string[] week = { "buying at home", "on the road to the capital", "at the capital's market", "on the road home", "selling at home", "selling at home (market day)", "resting" };
+            Row("Today", week[T.WeekdayIndex]);
+            Row("Sold last week", M(b.LastSales));
+            var v = T.VillageOf(b);
+            if (v != null && !string.IsNullOrEmpty(v.MerchantNote)) Para(v.MerchantNote);
+            Para("He trades on his own purse: he buys what " + T.DomainName(T.DomainOf(b)) + " has too much of, sells it at the capital, and brings back what it's short of.");
         }
 
         void ManorPanel(Building b)

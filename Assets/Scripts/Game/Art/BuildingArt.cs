@@ -65,6 +65,8 @@ namespace MedievalTown.Game.Art
                 case BuildingType.Fishpond: return 8;
                 case BuildingType.Bakehouse: return 20;
                 case BuildingType.Butcher: case BuildingType.Weaver: return 14;
+                case BuildingType.VillageBarn: return 12;
+                case BuildingType.MerchantHouse: return 24;
                 default: return 0;
             }
         }
@@ -265,6 +267,8 @@ namespace MedievalTown.Game.Art
                 case BuildingType.Bakehouse: Bakehouse(k); break;
                 case BuildingType.Butcher: Butcher(k); break;
                 case BuildingType.Weaver: Weaver(k); break;
+                case BuildingType.VillageBarn: VillageBarn(k); break;
+                case BuildingType.MerchantHouse: MerchantHouse(k); break;
             }
             k.Tg.Outline(OL);
             string n = type + "_" + v + "_" + si;

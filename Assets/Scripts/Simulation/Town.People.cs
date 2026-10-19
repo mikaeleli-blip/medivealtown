@@ -271,7 +271,7 @@ namespace MedievalTown.Simulation
             var church = Church; if (church != null && p.Age >= 1) church.Graves++;
             var home = GetBuilding(p.HomeId); if (home != null) home.Residents.Remove(p.Id);
             // heriot: when a serf dies the lord takes something from the house
-            if (p.Rank == Rank.Serf && !p.IsChild && home != null && home.Stock[(int)Good.Grain] > 20) { float h = Math.Min(10, home.Stock[(int)Good.Grain] * 0.1f); home.Stock[(int)Good.Grain] -= h; PutInStores(Good.Grain, h); }
+            if (p.Rank == Rank.Serf && !p.IsChild && home != null && home.Stock[(int)Good.Grain] > 20) { float h = Math.Min(10, home.Stock[(int)Good.Grain] * 0.1f); home.Stock[(int)Good.Grain] -= h; PutLocal(VillageOf(home), Good.Grain, h); }
             var work = GetBuilding(p.WorkId); if (work != null) work.Employees.Remove(p.Id);
             People.Remove(p);
             if (p.Id == KingId) Succession(p);

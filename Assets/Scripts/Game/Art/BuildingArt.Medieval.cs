@@ -900,6 +900,51 @@ namespace MedievalTown.Game.Art
             k.M.PileAt = new Vector2Int(-1, -1);
         }
 
+        /// <summary>A village barn: a long timber barn under thatch with big double doors, sacks stacked by them.</summary>
+        static void VillageBarn(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.R(0, y0 + 24, 48, 8, W ? "#d8d2c6" : "#b8996a");
+            Shadow(tg, 2, y0 + 27, 44);
+            Thatch(tg, 0, y0 - 10, 48, 18, W, ThatchOld, 6);
+            Planks(tg, 2, y0 + 8, 44, 19, "#8a5a34", "#6e4428", "#a8784a");
+            for (int x = 2; x < 46; x += 11) tg.R(x, y0 + 8, 1, 19, TIMBERDARK);
+            tg.R(2, y0 + 8, 44, 1, TIMBERDARK);
+            // the great doors, one standing open on the dark inside
+            Door(k, 18, y0 + 12, 12, 15, "#7a4e2c");
+            tg.R(18, y0 + 12, 6, 15, "#3a2418"); tg.R(18, y0 + 12, 6, 1, "#5a3a22");
+            tg.Line(25, y0 + 13, 29, y0 + 25, "#5a3a22"); tg.Line(29, y0 + 13, 25, y0 + 25, "#5a3a22");
+            Sack(tg, 6, y0 + 22); Sack(tg, 10, y0 + 22, "#e0d0a0"); Sack(tg, 8, y0 + 19);
+            Sack(tg, 36, y0 + 22); Sack(tg, 40, y0 + 22, "#e0d0a0");
+            Foundation(tg, 2, y0 + 26, 44);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
+        /// <summary>A merchant's house: a tall timber-framed house with a jettied upper floor, his covered cart in the yard and crates waiting.</summary>
+        static void MerchantHouse(Ctx k)
+        {
+            var bg = k.Bg; var tg = k.Tg; bool W = k.Winter; int y0 = k.Y(0);
+            bg.R(0, y0 + 24, 48, 8, W ? "#d8d2c6" : "#b8996a");
+            Shadow(tg, 1, y0 + 27, 30);
+            Shingles(tg, 0, y0 - 16, 30, 16, Tiles, W);
+            Chimney(k, 20, y0 - 22, 8);
+            Daub(tg, 1, y0 - 1, 28, 12, Daubs[2], true, false);
+            Window(k, 6, y0 + 2, 4, 4, false, TIMBERMID); Window(k, 19, y0 + 2, 4, 4, false, TIMBERMID);
+            tg.R(0, y0 + 10, 30, 2, TIMBERDARK);
+            Daub(tg, 2, y0 + 12, 26, 15, Daubs[1]);
+            Door(k, 12, y0 + 16, 6, 11, "#5a3a22");
+            // the sign: a pair of scales
+            tg.R(21, y0 + 13, 7, 6, "#6e4428"); tg.R(24, y0 + 14, 1, 4, "#e0b04a"); tg.R(22, y0 + 15, 5, 1, "#e0b04a"); tg.D(22, y0 + 16, "#e0b04a"); tg.D(26, y0 + 16, "#e0b04a");
+            Foundation(tg, 2, y0 + 26, 26);
+            // the covered cart
+            tg.R(32, y0 + 14, 14, 9, W ? "#efece6" : "#e8dcc0"); for (int x = 33; x < 46; x += 4) tg.R(x, y0 + 14, 1, 9, "#c8b890");
+            tg.R(31, y0 + 23, 16, 2, "#8a5a34");
+            tg.Disc(34, y0 + 26, 2.4f, "#3a2a1a"); tg.Disc(44, y0 + 26, 2.4f, "#3a2a1a"); tg.D(34, y0 + 26, "#8a6a4a"); tg.D(44, y0 + 26, "#8a6a4a");
+            tg.Line(46, y0 + 24, 47, y0 + 21, "#6e4428");
+            Crate(tg, 38, y0 + 26 - 6, 5);
+            k.M.PileAt = new Vector2Int(-1, -1);
+        }
+
         /// <summary>A boundary stone: a squat standing stone with a cross cut in it, on a little patch of trodden ground.</summary>
         static void BoundaryStone(Ctx k)
         {

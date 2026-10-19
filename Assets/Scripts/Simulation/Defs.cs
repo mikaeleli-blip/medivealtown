@@ -7,7 +7,7 @@ namespace MedievalTown.Simulation
     public enum BuildingType
     {
         Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, StewardHall, Wall, WallTower, Gatehouse, VillageCross, Manor, BoundaryStone,
-        Pasture, Sheepfold, Fishpond, Bakehouse, Butcher, Weaver
+        Pasture, Sheepfold, Fishpond, Bakehouse, Butcher, Weaver, VillageBarn, MerchantHouse
     }
     public enum Category { Roads, Homes, Fields, Works, Trades, Church, Crown, Realm, Hidden }
 
@@ -15,7 +15,7 @@ namespace MedievalTown.Simulation
     public enum Rank { Serf, Freeman, Reeve, Collector, Steward, Priest, Knight, Baron, Noble, King }
 
     /// <summary>What someone is doing today.</summary>
-    public enum Chore { None, OwnStrip, WeekWork, Build, Gather, Trade, Mass, Pray, Court, Patrol, Play, Rest, Flee, Collect, Deliver, Accounts }
+    public enum Chore { None, OwnStrip, WeekWork, Build, Gather, Trade, Mass, Pray, Court, Patrol, Play, Rest, Flee, Collect, Deliver, Accounts, Travel, Market }
 
     /// <summary>A temperament. The king's shapes the whole realm.</summary>
     public enum Trait { Just, Pious, Greedy, Cruel, Brave, Gentle }
@@ -114,7 +114,12 @@ namespace MedievalTown.Simulation
         public const float FishPerWorker = 4f;
         public const float ClothWear = 1f;        // cloth a person wears out in a year
         public const float BeastPrice = 3.6f, WoolPrice = 0.5f;
-        public const float CreditLimit = 4f;        // what a supplier lets a shop have on credit, paid back from its takings
+        public const float CreditLimit = 4f;
+        // ---- merchants
+        public const float CartLoad = 80f;          // what a merchant's cart carries (a measure of grain counts one, a beast or a length of cloth five)
+        public const float MerchantBuys = 0.9f, MerchantWholesale = 1.15f, MerchantRetail = 1.3f;   // of the going price
+        public const float MerchantStake = 12f;     // the savings a merchant sets up with
+        public const int PetitionDays = 7;          // days a village waits for the king's answer        // what a supplier lets a shop have on credit, paid back from its takings
 
         // ---- villages and baronies
         public const int VillageRadius = 14;       // tiles from a village cross that belong to its village
@@ -168,6 +173,8 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.StewardHall, Category = Category.Crown, Name = "Steward's Hall", Blurb = "Where the king's steward lives and keeps the crown's tax chest. His collector brings the taxes here every Monday; the steward takes them on to the castle on Tuesday.", W = 3, H = 2, Timber = 16, Stone = 18, Work = 12, Unique = true, IsHome = true, Beds = 4, Color = "#3e5a7a" });
             Add(new BuildingDef { Type = BuildingType.VillageCross, Category = Category.Realm, Name = "Village Cross", Blurb = "Founds a new village: a stone cross and a well on a green. Homes, strips and works within 14 tiles belong to it. Families come once there are cottages, and they choose their own reeve.", W = 2, H = 2, Timber = 2, Stone = 6, Work = 3, Color = "#d8c8a0" });
             Add(new BuildingDef { Type = BuildingType.BoundaryStone, Category = Category.Realm, Name = "Boundary Stone", Blurb = "A carved stone that marks a village's bounds. Set one on a village's land and the land around it, 10 tiles each way, belongs to that village too. Chain them to push the bounds further.", W = 1, H = 1, Stone = 2, Work = 1, Color = "#bdb6aa" });
+            Add(new BuildingDef { Type = BuildingType.VillageBarn, Category = Category.Realm, Name = "Village Barn", Blurb = "The village's own store. What its quarry, woods and mill bring in is kept here, and its families and shops buy grain here first. A village without one draws on its lord's granary: the baron's manor, or the king's.", W = 3, H = 2, Timber = 16, Stone = 4, Work = 8, IsStorage = true, Color = "#9a5a3a" });
+            Add(new BuildingDef { Type = BuildingType.MerchantHouse, Category = Category.Realm, Name = "Merchant's House", Blurb = "A barony's merchant: a freeman who trades on his own purse. He buys what his barony has too much of, carts it to the capital's market, and brings back what his barony is short of. One to a barony.", W = 3, H = 2, Timber = 18, Stone = 6, Work = 10, Workers = 1, WorkerRank = Rank.Freeman, IsStorage = true, Color = "#5a6a8a" });
             Add(new BuildingDef { Type = BuildingType.Manor, Category = Category.Realm, Name = "Baron's Manor", Blurb = "Makes a village the seat of a barony. A baron comes to live here with his tax collector. Villages you found nearby will owe their taxes to him, and he to the crown.", W = 4, H = 3, Timber = 30, Stone = 40, Work = 30, IsHome = true, Beds = 6, Color = "#7a3a4a" });
             Add(new BuildingDef { Type = BuildingType.Wall, Category = Category.Crown, Name = "Castle Wall", Blurb = "A stone curtain wall with a walkway and battlements. Drag to lay a line of it; it joins up with towers and the gatehouse. Nobody can walk through it.", W = 1, H = 1, Stone = 3, Work = 1, IsWall = true, Color = "#6e6860" });
             Add(new BuildingDef { Type = BuildingType.WallTower, Category = Category.Crown, Name = "Wall Tower", Blurb = "A round stone tower to anchor the corners and long runs of the wall.", W = 2, H = 2, Timber = 4, Stone = 20, Work = 8, IsWall = true, Color = "#7a746a" });

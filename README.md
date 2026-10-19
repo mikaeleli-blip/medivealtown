@@ -116,6 +116,29 @@ reeve collects it on Friday with the other taxes, so it climbs the same chain as
 
 ![Trades](docs/trades.png)
 
+## Local stores and the merchants
+
+Goods are local. Nothing is shared across the whole map any more.
+
+- **Each village keeps its own goods** in its **Village Barn** (Realm tab): what its quarry, woods and mill bring in,
+  and the grain its families and shops buy first. A village without a barn draws on its lord's granary: the baron's
+  manor in a barony, the royal granary in the crown's own villages. The capital's store is the Royal Granary.
+- **A barony's grain taxes stay in the barony**, in the baron's granary at the manor. Only coin goes on to the crown.
+  The baron's granary keeps back what his own household needs until harvest; if it runs short he buys from the king.
+- **Folk shop in their own barony** (or the crown's lands) and nowhere else. What they wanted and couldn't buy shows on
+  the village cross as **Short of**, along with how many days of grain it has.
+- **Petitions.** A village that's going hungry before the harvest sends its reeve to court to beg grain. Answer in the
+  Court book or at its cross: **Send the grain** (it arrives at once and the village is grateful) or **Refuse** (they're
+  bitter). No answer in 7 days counts as a refusal. The royal granary always keeps enough to feed the court.
+- **Purveyance.** If the royal (or a baron's) table is bare, his men take grain from the villagers' own stores for a
+  pittance, and folk hate it.
+- **Merchants.** Build a **Merchant's House** in a barony (one each). A freeman merchant trades on his own purse:
+  Monday he buys what his barony has to spare and the capital wants, Tuesday he takes the road, Wednesday he sells at the
+  capital's market and buys what his barony is short of, Thursday he comes home, Friday and market day he sells it to
+  the barony's shops, its granary, or to families straight off his cart. He only trades with the capital for now.
+
+![Village barn, merchant's house, royal granary and a manor](docs/barn-merchant.png)
+
 ## The treasury
 
 - **Wages** are paid only for a day's real work: the woods and quarry stand idle (unpaid) when the stores hold what the
@@ -174,6 +197,8 @@ the new reeve.
 | Village Cross | Realm | 2×2 | 2 / 6 | 3 |
 | Baron's Manor | Realm | 4×3 | 30 / 40 | 30 |
 | Boundary Stone | Realm | 1×1 | 0 / 2 | 1 |
+| Village Barn | Realm | 3×2 | 16 / 4 | 8 |
+| Merchant's House | Realm | 3×2 | 18 / 6 | 10 |
 | Castle Wall | Crown | 1×1 (drag to paint) | 0 / 3 | 1 per tile |
 | Wall Tower | Crown | 2×2 | 4 / 20 | 8 |
 | Gatehouse | Crown | 3×2 | 8 / 30 | 14 |
@@ -213,6 +238,7 @@ The four books at the top right:
 - `Assets/Scripts/Simulation`: engine-free and saved as JSON.
   - `Town.cs`: the map, placing and removing buildings, stores, a new manor.
   - `Town.Day.cs`: the daily plan and the day.
+  - `Town.Stores.cs`: local stores, village needs, petitions, purveyance and the barony merchants.
   - `Town.Trade.cs`: the trades and shops, households' shopping, the market toll.
   - `Town.People.cs`: households, housing, strips, trades, births, deaths, marriages, flight, newcomers.
   - `Town.Realm.cs`: villages, baronies, reeves, the steward, the tax chain, Michaelmas accounts.
