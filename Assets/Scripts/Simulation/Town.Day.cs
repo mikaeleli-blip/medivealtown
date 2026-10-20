@@ -45,6 +45,7 @@ namespace MedievalTown.Simulation
             var quarry = needStone ? OfType(BuildingType.Quarry).FirstOrDefault(q => QuarryOnHill(q) || RocksNear(q) > 0) : null;
             var woods = needTimber ? OfType(BuildingType.Woodcutter).FirstOrDefault(w => TreesNear(w) > 0) : null;
             int mc = 0;
+            Dictionary<int, float> fieldHands = null;
             var seat = Seat; var church = Church;
             int dc = 0;
             Func<Building> nextSite = () =>
@@ -115,6 +116,10 @@ namespace MedievalTown.Simulation
                     if (w != null && w.Built && !cold && TradeNeeded(w)) { p.Chore = Chore.Trade; p.TaskId = w.Id; continue; }
                     // freemen without a trade hire on to the crown's building work for a wage, if he can pay
                     if (Coin >= Policy.FreeWage) { var s = nextSite(); if (s != null) { p.Chore = Chore.Build; p.TaskId = s.Id; continue; } }
+                    // or hire out as a day labourer: reaping for a family that can't get its harvest in, or on the lord's demesne
+                    if (fieldHands == null) fieldHands = FieldHands();
+                    var lf = HireField(p, fieldHands);
+                    if (lf != null) { p.Chore = Chore.Labour; p.TaskId = lf.Id; continue; }
                     var home = HomeOf(p);
                     p.Chore = home != null && home.Stock[(int)Good.Firewood] < 40 ? Chore.Gather : Chore.Rest;
                     continue;
@@ -173,6 +178,7 @@ namespace MedievalTown.Simulation
                         else PutInStores(Good.Firewood, Balance.GatherWood * hands);
                         break;
                     case Chore.Build: if (t != null && !t.Built) BuildWork(t, p); break;
+                    case Chore.Labour: if (t != null) Labour(t, p, hands); break;
                     case Chore.Gather: { var h = HomeOf(p); if (h != null) h.Stock[(int)Good.Firewood] += Balance.GatherWood * hands * (si == 3 ? 0.8f : 1f); } break;
                     case Chore.Trade: if (t != null && t.Type != BuildingType.MerchantHouse) { if (t.Def.IsShop) ShopWork(t, p, hands); else TradeWork(t, p); } break;
                 }
@@ -248,18 +254,18 @@ namespace MedievalTown.Simulation
         }
 
         /// <summary>Spring and summer: the crop grows with the hours put into it. Autumn: it's reaped. Every harvest gives the church its tithe.</summary>
-        void FieldWork(Building f, float hands, float bonus, Building pantry)
+        float FieldWork(Building f, float hands, float bonus, Building pantry)
         {
             int si = Season;
             bool lords = f.Type == BuildingType.Demesne;
             if (si <= 1)
             {
                 f.CropGrowth = Math.Min(1f, f.CropGrowth + (lords ? Balance.DemesneGrowth : Balance.StripGrowth) * hands * bonus);
-                return;
+                return 0;
             }
-            if (si != 2) return;
+            if (si != 2) return 0;
             float q = Math.Min(f.CropLeft, Balance.HarvestPerWorker * hands * bonus);
-            if (q <= 0) return;
+            if (q <= 0) return 0;
             f.CropLeft -= q; f.Harvested += q;
             float tithe = Church != null ? q * Balance.Tithe : 0;
             if (tithe > 0) Church.Stock[(int)Good.Grain] += tithe;
@@ -270,6 +276,70 @@ namespace MedievalTown.Simulation
             }
             else PutInStores(Good.Grain, q - tithe);
             Today.Harvest += q; Today.Tithe += tithe;
+            return q - tithe;
+        }
+
+        // =====================================================================
+        // Day labour
+        // =====================================================================
+        /// <summary>Hands already set to each field today (serfs on their strips, week-work, hired men).</summary>
+        Dictionary<int, float> FieldHands()
+        {
+            var d = new Dictionary<int, float>();
+            foreach (var p in People)
+                if ((p.Chore == Chore.OwnStrip || p.Chore == Chore.WeekWork || p.Chore == Chore.Labour) && p.TaskId >= 0)
+                { float n; d.TryGetValue(p.TaskId, out n); d[p.TaskId] = n + (p.IsChild ? Balance.ChildFieldWork : 1f); }
+            return d;
+        }
+
+        /// <summary>A field a freeman with nothing else to do can hire on to: at harvest, the strip or demesne in his own lands most likely
+        /// to be left to rot; in spring and summer, the lord's demesne if the lord can pay.</summary>
+        Building HireField(Citizen p, Dictionary<int, float> hands)
+        {
+            int si = Season, dom = DomainOf(p);
+            bool lordPays = dom < 0 ? Coin >= Policy.FreeWage + Policy.CoinReserve * 0.5f : LordPurse(dom) >= Policy.FreeWage;
+            Building best = null; float bestShort = 0;
+            if (si == 2)
+            {
+                int left = Math.Max(1, DaysInSeason - DayOfSeason + 1);
+                foreach (var f in Buildings)
+                {
+                    if (!f.Built || !f.Def.IsField || f.CropLeft < 1 || DomainOf(f) != dom) continue;
+                    if (f.Type == BuildingType.Demesne ? !lordPays : HomeOf(GetCitizen(f.HolderId)) == null) continue;
+                    float n; hands.TryGetValue(f.Id, out n);
+                    float shortBy = f.CropLeft - n * Balance.HarvestPerWorker * left * 0.9f;
+                    if (shortBy > bestShort) { bestShort = shortBy; best = f; }
+                }
+            }
+            else if (si <= 1 && lordPays)
+                foreach (var f in Buildings)
+                {
+                    if (!f.Built || f.Type != BuildingType.Demesne || f.CropGrowth >= 0.98f || DomainOf(f) != dom) continue;
+                    float n; hands.TryGetValue(f.Id, out n);
+                    if (n < 4) { best = f; break; }
+                }
+            if (best != null) { float m; hands.TryGetValue(best.Id, out m); hands[best.Id] = m + 1; }
+            return best;
+        }
+
+        /// <summary>A hired day in the fields. The lord pays a day's wage on his demesne; a family pays its reaper in grain, a share of what he cuts.</summary>
+        void Labour(Building f, Citizen p, float hands)
+        {
+            bool lords = f.Type == BuildingType.Demesne;
+            var pantry = lords ? null : HomeOf(GetCitizen(f.HolderId));
+            if (!lords && pantry == null) return;
+            float got = FieldWork(f, hands, ReeveBonus(f), pantry);
+            if (lords)
+            {
+                int dom = DomainOf(f);
+                if (dom < 0) { float w = Math.Min(Policy.FreeWage, Math.Max(0, Coin)); Coin -= w; WeekOut += w; p.Coin += w; Book("Wages: the demesne", -w); }
+                else p.Coin += TakeFromLord(dom, Policy.FreeWage);
+                return;
+            }
+            var home = HomeOf(p);
+            float share = Math.Min(pantry.Stock[(int)Good.Grain], got * Balance.ReaperShare);
+            if (share <= 0 || home == null) return;
+            pantry.Stock[(int)Good.Grain] -= share; home.Stock[(int)Good.Grain] += share;
         }
 
         void BuildWork(Building s, Citizen p)

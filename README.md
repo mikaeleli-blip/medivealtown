@@ -156,6 +156,10 @@ Goods are local. Nothing is shared across the whole map any more.
   treasury is above its reserve. It's the main way the crown's coin goes back into the village.
 - **The granary** sells grain to the shops and freemen (0.3c), lets a baker or brewer with an empty purse have grain on
   credit, and buys grain it's short of from its own serfs before the merchant. Freemen buy grain from serf families first.
+- **Every freeman has a way to earn.** When the crown's woods or quarry stand idle, their men move to an empty place at
+  the mill or a shop in their own lands. With no trade, a freeman hires on to the crown's building sites for a wage; at
+  harvest he reaps for any family that can't get its strip in before it rots, for a share of what he cuts (about an
+  eighth), or on a lord's demesne for a day's wage (spring and summer too). Hiring favours folk from the same lands.
 - **Freemen with no work and no coin** leave to seek work in the towns, rather than run up debts forever.
 
 ## The hierarchy

@@ -853,6 +853,7 @@ namespace MedievalTown.Game
                     return T.Season == 2 ? "week-work: reaping the demesne" : "week-work on the demesne";
                 case Chore.Build: return "building the " + (t != null ? t.Def.Name : "site");
                 case Chore.Gather: return "gathering firewood";
+                case Chore.Labour: return t != null && t.Type == BuildingType.Demesne ? "hired on the lord's demesne" : "reaping for hire" + (t != null && T.GetCitizen(t.HolderId) != null ? " for the " + T.GetCitizen(t.HolderId).Family + "s" : "");
                 case Chore.Trade: return t == null ? "at work" : t.Type == BuildingType.Mill ? "grinding at the mill" : t.Type == BuildingType.Alehouse ? "brewing ale" : t.Type == BuildingType.Quarry ? "quarrying stone" : "felling and splitting wood";
                 case Chore.Mass: return "at mass";
                 case Chore.Pray: return T.Church != null ? "keeping the church" : "saying the offices";
@@ -939,7 +940,7 @@ namespace MedievalTown.Game
                     if (b.Type == BuildingType.Strip) Row("Held by", holder != null ? "the " + holder.Family + " family" : "nobody", holder != null ? Ui.Ink : Ui.Warn);
                     Row("Crop", Mathf.RoundToInt(b.CropGrowth * 100) + "% grown");
                     if (T.Season == 2 || b.Harvested > 0) Row("Reaped / standing", Mathf.FloorToInt(b.Harvested) + " / " + Mathf.FloorToInt(b.CropLeft));
-                    int hands = T.People.Count(p => p.TaskId == b.Id && (p.Chore == Chore.OwnStrip || p.Chore == Chore.WeekWork));
+                    int hands = T.People.Count(p => p.TaskId == b.Id && (p.Chore == Chore.OwnStrip || p.Chore == Chore.WeekWork || p.Chore == Chore.Labour));
                     Row("Hands today", hands.ToString());
                 }
                 if (b.Residents.Count > 0)

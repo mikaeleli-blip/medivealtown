@@ -138,6 +138,20 @@ namespace MedievalTown.Simulation
             else { var manor = GetBuilding(bar.ManorId); if (manor != null) manor.Coin += v; }
         }
 
+        /// <summary>Coin a baron has to pay wages with (keeping a little by).</summary>
+        float LordPurse(int domain)
+        {
+            var bar = GetBarony(domain); if (bar == null) return Math.Max(0, Coin - Policy.CoinReserve * 0.5f);
+            var baron = GetCitizen(bar.BaronId); return baron != null ? Math.Max(0, baron.Coin - 3f) : 0;
+        }
+        /// <summary>A baron pays out of his own purse; returns what he paid.</summary>
+        float TakeFromLord(int domain, float v)
+        {
+            var bar = GetBarony(domain); var baron = bar != null ? GetCitizen(bar.BaronId) : null;
+            if (baron == null) return 0;
+            float w = Math.Min(v, Math.Max(0, baron.Coin)); baron.Coin -= w; return w;
+        }
+
         /// <summary>The going price of a good, a measure of it.</summary>
         public static float PriceOf(Good g)
         {

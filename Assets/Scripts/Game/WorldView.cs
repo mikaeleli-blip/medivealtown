@@ -576,7 +576,7 @@ namespace MedievalTown.Game
             int si = town.Season;
             switch (p.Chore)
             {
-                case Chore.OwnStrip: case Chore.WeekWork:
+                case Chore.OwnStrip: case Chore.WeekWork: case Chore.Labour:
                     if (t != null && t.Def.IsField)
                     {
                         // working along a furrow a step at a time; the season says what the work is

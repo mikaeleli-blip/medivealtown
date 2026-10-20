@@ -15,7 +15,7 @@ namespace MedievalTown.Simulation
     public enum Rank { Serf, Freeman, Reeve, Collector, Steward, Priest, Knight, Baron, Noble, King }
 
     /// <summary>What someone is doing today.</summary>
-    public enum Chore { None, OwnStrip, WeekWork, Build, Gather, Trade, Mass, Pray, Court, Patrol, Play, Rest, Flee, Collect, Deliver, Accounts, Travel, Market }
+    public enum Chore { None, OwnStrip, WeekWork, Build, Gather, Trade, Mass, Pray, Court, Patrol, Play, Rest, Flee, Collect, Deliver, Accounts, Travel, Market, Labour }
 
     /// <summary>A temperament. The king's shapes the whole realm.</summary>
     public enum Trait { Just, Pious, Greedy, Cruel, Brave, Gentle }
@@ -119,6 +119,7 @@ namespace MedievalTown.Simulation
         public const float CartLoad = 80f;          // what a merchant's cart carries (a measure of grain counts one, a beast or a length of cloth five)
         public const float MerchantBuys = 0.9f, MerchantWholesale = 1.15f, MerchantRetail = 1.3f;   // of the going price
         public const float MerchantStake = 12f;
+        public const float ReaperShare = 0.12f;     // a hired reaper's share of what he cuts on a family's strip: the old twelfth sheaf and a bit
         public const float GrainSpoil = 0.0007f;    // grain lost in store each day (about 5% a year)     // the savings a merchant sets up with
         public const int PetitionDays = 7;          // days a village waits for the king's answer        // what a supplier lets a shop have on credit, paid back from its takings
 
