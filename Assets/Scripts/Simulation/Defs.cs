@@ -104,7 +104,7 @@ namespace MedievalTown.Simulation
         public static readonly float[] StartStock = { 420f, 0f, 60f, 70f, 30f, 0f, 0f, 0f, 0f, 0f, 0f, 0f };
 
         // ---- trades and shops (prices in coin; a day's food for one is about a third of a coin)
-        public const float VillageGrain = 0.22f;    // what bakers and brewers pay a serf family for its spare grain
+        public const float VillageGrain = 0.18f;    // what bakers and brewers pay a serf family for its spare grain
         public const float BreadFeeds = 1f, MeatFeeds = 1.3f, FishFeeds = 1f;
         public const float BakePerWorker = 14f;     // loaves a baker makes in a day, a loaf from a measure of grain
         public const float BeastsPerWorker = 0.18f; // beasts a herdsman raises in a day
@@ -119,7 +119,17 @@ namespace MedievalTown.Simulation
         public const float CartLoad = 80f;          // what a merchant's cart carries (a measure of grain counts one, a beast or a length of cloth five)
         public const float MerchantBuys = 0.9f, MerchantWholesale = 1.15f, MerchantRetail = 1.3f;   // of the going price
         public const float MerchantStake = 12f;
-        public const float ReaperShare = 0.12f;     // a hired reaper's share of what he cuts on a family's strip: the old twelfth sheaf and a bit
+        public const float ReaperShare = 0.12f;
+        public const float TallageFree = 4f, TallageOnMeans = 0.25f;   // tallage takes this share of what a serf family has put by above this
+        public const float TreatsFrom = 2f, TreatsFull = 10f;   // coin a head a household needs before it keeps a better table, and for the best one
+        // Shops as businesses
+        public const float FinePerMaterial = 0.3f;   // the entry fine for taking up a shop: about this much per measure of timber and stone it took to build
+        public const float FineDown = 0.25f;         // a family can take one up with this share of the fine paid down, the rest by the week
+        public const float FineWeeks = 12f;          // weeks the rest of the fine is paid over
+        public const float OwnerStake = 0.3f;        // share of their savings a family puts in the shop's till when they take it up
+        public const float PriceStep = 0.05f;        // a shop moves its price by this share of the usual price a week
+        public const float PriceLow = 0.75f, PriceHigh = 1.8f;   // and keeps it between these shares of the usual price
+        public const float OwnerDraw = 0.6f;         // share of what's in the till above its float the owner takes home each Sunday     // a hired reaper's share of what he cuts on a family's strip: the old twelfth sheaf and a bit
         public const float GrainSpoil = 0.0007f;    // grain lost in store each day (about 5% a year)     // the savings a merchant sets up with
         public const int PetitionDays = 7;          // days a village waits for the king's answer        // what a supplier lets a shop have on credit, paid back from its takings
 

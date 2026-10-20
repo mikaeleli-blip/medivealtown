@@ -89,9 +89,26 @@ rises and drives the king out, and that reign is over.
 
 ## Trades and shops
 
-Freeman families run the trades for themselves: no crown wage, they keep what they sell for, and every sale owes the
-crown its **market toll** (10% by default, set in the Laws). The toll is laid on the shopkeeper's household and the
-reeve collects it on Friday with the other taxes, so it climbs the same chain as everything else.
+Every trade is a business with its own **till**: takings go in; its makings, its hired hands' wages and its supplier's
+credit come out. Every sale in a freeman's shop owes the crown its **market toll** (10% by default, set in the Laws),
+laid on the owner's household and collected by the reeve on Friday with the other taxes.
+
+- **Who holds it.** A new shop belongs to its lord (the king, or the baron in a barony), who runs it with hired freemen,
+  pays them from his purse and keeps the takings. Each day it goes to the freeman family in those lands with the most
+  put by, if they can pay the **entry fine** (about 0.3c per measure of timber and stone it took to build): in full, or a
+  quarter down and the rest by the week over 12 weeks. Four weeks behind and the lord takes it back. One shop to a family.
+  The family puts some of its savings in the till to start.
+- **Who works it.** The owner, then his wife and grown children at home (no wage), then hired freemen at the day wage,
+  only while the till holds a few days' wages for each. When an owner dies or leaves, family working there carry it on.
+- **Each Sunday** the shop pays its share of the fine, the owner takes home most of what's above the till's float, and it
+  decides how many hands it wants: more while what it makes sells and it can pay them, fewer when stock piles up, it
+  loses money or has nothing to work with. Through the week the owner tops up the till from savings if it runs low, or
+  takes out a little bread money for the family. A baker's, butcher's or fisher's family eats some of its own.
+- **Prices follow stock.** The baker, butcher, fisher, weaver and alewife raise their price a step when they sell out
+  and lower it when goods pile up, between three-quarters and nearly twice the usual price. Folk buy in their own
+  village, cheapest first.
+- **The better off keep a better table:** families with coin to spare buy more bread, meat, fish and cloth. Tallage
+  is laid by means: the set sum on every serf family, and a quarter of what a family has put by above 4c.
 
 | Raw goods | Made from | Sells to |
 |---|---|---|
@@ -173,7 +190,7 @@ Goods are local. Nothing is shared across the whole map any more.
 | **Collector** | Each baron has one, and so does the steward once there are other villages. Rides out to empty the chests. |
 | **Priest** | Says mass on Sundays and takes a tenth of every harvest as tithe. Gives alms from it to the hungry. |
 | **Reeve** | A serf chosen by each village every spring. Collects its taxes, and while he's in office its strips are worked 10% better. |
-| **Freemen** | Run the trades and shops for themselves, or work the crown's mill, woods and quarry for its wage. Pay rent (0.6c a week) and the market toll, and buy bread, grain and firewood. |
+| **Freemen** | Take up the trades and shops for an entry fine and run them for themselves, hire on as hands for a wage, or work the crown's mill, woods and quarry. Pay rent (0.6c a week) and the market toll, and buy bread, grain and firewood. |
 | **Serfs** | Owe the king week-work: 2 days a week by custom, on his building sites, carting stone and timber, and gathering his wood. When there's nothing to do they go back to their own strips, which they work the rest of the week. Sunday is for mass. |
 
 **Families and land.** A serf family only settles where there's an empty cottage *and* a strip field going spare. A big
@@ -257,6 +274,7 @@ The four books at the top right:
   - `Town.Day.cs`: the daily plan and the day.
   - `Town.Stores.cs`: local stores, village needs, petitions, purveyance and the barony merchants.
   - `Town.Trade.cs`: the trades and shops, households' shopping, the market toll.
+  - `Town.Business.cs`: shops as businesses: entry fines and ownership, the till, wages, the owner's draw, staffing and prices.
   - `Town.People.cs`: households, housing, strips, trades, births, deaths, marriages, flight, newcomers.
   - `Town.Realm.cs`: villages, baronies, reeves, the steward, the tax chain, Michaelmas accounts.
   - `Town.Court.cs`: succession, marriages, feast days, the priest, revolt.

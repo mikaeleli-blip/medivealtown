@@ -25,11 +25,11 @@ namespace MedievalTown.Simulation
         }
         static void Share(List<Citizen> to, float amount) { if (to.Count == 0) return; foreach (var p in to) p.Coin += amount / to.Count; }
 
-        /// <summary>A shop takes coin for a sale. The crown's toll is laid on the shopkeeper's household for the reeve to collect.</summary>
+        /// <summary>A shop takes coin for a sale into its till. The crown's toll is laid on the owner's household for the reeve to
+        /// collect (a shop the lord runs himself owes no toll).</summary>
         void Takings(Building shop, float value)
         {
             if (value <= 0) return;
-            var staff = Staff(shop);
             // a shop that owes its supplier pays back from its takings first
             float repay = 0;
             var creditor = GetBuilding(shop.DebtTo);
@@ -37,10 +37,10 @@ namespace MedievalTown.Simulation
             else if (shop.Debt > 0.001f && creditor != null && creditor != shop) { repay = Math.Min(shop.Debt, value * 0.6f); shop.Debt -= repay; Takings(creditor, repay); }
             else if (creditor == null) shop.Debt = 0;
             if (shop.Debt < 0.001f) shop.DebtTo = -1;
-            Share(staff, value - repay);
+            shop.Coin += value - repay; shop.WeekCosts += repay;
             shop.WeekSales += value;
             float toll = value * Policy.MarketToll * (RulerIs(Trait.Greedy) ? 1.3f : 1f);
-            var home = staff.Count > 0 ? HomeOf(staff[0]) : null;
+            var home = HomeOf(OwnerOf(shop));
             if (toll > 0 && home != null && home.VillageId >= 0) { Assess(home, toll, 0); Taxes.Tolls += toll; }
         }
 
@@ -59,9 +59,9 @@ namespace MedievalTown.Simulation
                 if (StoreStock(want.Item2) >= want.Item3 * 2) continue;
                 var shop = Shops(want.Item1).Where(s => s.Stock[(int)want.Item2] >= 1).OrderBy(s => Dist2(s, seat)).FirstOrDefault();
                 if (shop == null) continue;
-                float q = Math.Min(Math.Min(want.Item3, shop.Stock[(int)want.Item2]), budget / shop.Def.Price);
+                float q = Math.Min(Math.Min(want.Item3, shop.Stock[(int)want.Item2]), budget / AskPrice(shop));
                 if (q < 0.5f) continue;
-                float v = q * shop.Def.Price;
+                float v = q * AskPrice(shop);
                 shop.Stock[(int)want.Item2] -= q; PutInStores(want.Item2, q);
                 Coin -= v; WeekOut += v; budget -= v; Book("The court's table", -v);
                 Takings(shop, v);
@@ -69,11 +69,12 @@ namespace MedievalTown.Simulation
             if (IsMarketDay && StoreStock(Good.Cloth) < court * 0.5f)
             {
                 var shop = Shops(BuildingType.Weaver).Where(s => s.Stock[(int)Good.Cloth] >= 1).FirstOrDefault();
-                if (shop != null && Coin - Policy.CoinReserve > shop.Def.Price)
+                float cp = shop != null ? AskPrice(shop) : 0;
+                if (shop != null && Coin - Policy.CoinReserve > cp)
                 {
                     shop.Stock[(int)Good.Cloth] -= 1; PutInStores(Good.Cloth, 1);
-                    Coin -= shop.Def.Price; WeekOut += shop.Def.Price; Book("Cloth for the household", -shop.Def.Price);
-                    Takings(shop, shop.Def.Price);
+                    Coin -= cp; WeekOut += cp; Book("Cloth for the household", -cp);
+                    Takings(shop, cp);
                 }
             }
             // the household wears out its clothes too
@@ -90,7 +91,10 @@ namespace MedievalTown.Simulation
                 if (folk.Any(p => p.Rank != Rank.Freeman)) continue;
                 if (CoinOf(folk) > 0.5f || h.Arrears < 2f) continue;
                 var w = GetBuilding(head.WorkId);
-                if (w != null && (w.Def.IsShop ? w.LastSales > 2f : TradeNeeded(w))) continue;
+                var own = FamilyShop(head);
+                if (own != null && own.LossWeeks < 3) continue;   // a family with a shop of its own stays while it pays its way
+                if (w != null && (w.Def.IsShop ? w.LastSales > 2f || w.OwnerId != head.Id : TradeNeeded(w))) continue;
+                if (own != null) LoseShop(own, null);
                 if (!Chance(0.5)) continue;
                 AddLog("The " + head.Family + " family, freemen with no work and no coin, left " + (VillageOf(h) != null ? VillageOf(h).Name : ManorName) + " to seek work in the towns.", LogKind.Bad);
                 foreach (var p in folk) { var partner = GetCitizen(p.PartnerId); if (partner != null && !folk.Contains(partner)) partner.PartnerId = -1; People.Remove(p); Fled++; }
@@ -115,7 +119,8 @@ namespace MedievalTown.Simulation
             foreach (var s in Shops(t))
             {
                 if (s.Stock[(int)g] < atLeast || DomainOf(s) != dom) continue;
-                float d = Dist2(s, home) + (s.VillageId == home.VillageId && s.VillageId >= 0 ? 0 : 6000);
+                // their own village's first, then the cheapest, then the nearest
+                float d = Dist2(s, home) * 0.2f + (s.VillageId == home.VillageId && s.VillageId >= 0 ? 0 : 6000) + AskPrice(s) / Math.Max(0.01f, s.Def.Price) * 400;
                 if (d < bd) { bd = d; best = s; }
             }
             return best;
@@ -194,28 +199,30 @@ namespace MedievalTown.Simulation
         {
             foreach (var b in Buildings.Where(x => x.Built && x.Def.IsShop && x.Def.Buys.HasValue && x.Employees.Count > 0).ToList())
             {
-                var d = b.Def; var staff = Staff(b);
-                float purse = Math.Max(0, CoinOf(staff) - 0.5f);
-                if (b.Stock[(int)d.Sells.Value] >= d.Cap) continue;
+                var d = b.Def;
+                float purse = ShopPurse(b);
+                if (b.Stock[(int)d.Sells.Value] >= d.Cap * 0.6f) continue;   // plenty made: no more makings till it sells
                 Good g = d.Buys.Value;
                 if (g == Good.Grain)
                 {
                     float rate = b.Type == BuildingType.Bakehouse ? Balance.BakePerWorker : Balance.BrewPerWorker * 0.5f;
                     float want = rate * b.Employees.Count * 3 - b.Stock[(int)Good.Grain];
                     if (want < 2 || purse < 0.3f) continue;
-                    // serf families with grain to spare, nearest first
+                    // serf families with grain to spare, a little from each (their own village's first)
                     int dom = DomainOf(b);
-                    foreach (var h in Buildings.Where(x => x.Built && IsPeasantHome(x.Type) && x.Residents.Count > 0 && DomainOf(x) == dom).OrderBy(x => Dist2(x, b) + (x.VillageId == b.VillageId ? 0 : 6000)).ToList())
-                    {
-                        if (want < 1 || purse < Balance.VillageGrain) break;
-                        float spare = h.Stock[(int)Good.Grain] - GrainKeep(h);
-                        if (spare < 3) continue;
-                        float q = Math.Min(Math.Min(spare, want), purse / Balance.VillageGrain);
-                        float v = q * Balance.VillageGrain;
-                        h.Stock[(int)Good.Grain] -= q; b.Stock[(int)Good.Grain] += q; want -= q; purse -= v;
-                        Pay(staff, v);
-                        var seller = Purse(h); Share(seller.Take(1).ToList(), v);
-                    }
+                    var sellers = Buildings.Where(x => x.Built && IsPeasantHome(x.Type) && x.Residents.Count > 0 && DomainOf(x) == dom && x.Stock[(int)Good.Grain] - GrainKeep(x) >= 3).ToList();
+                    var near = sellers.Where(x => x.VillageId == b.VillageId).ToList(); if (near.Count > 0) sellers = near;
+                    float total = sellers.Sum(x => x.Stock[(int)Good.Grain] - GrainKeep(x));
+                    float take = Math.Min(Math.Min(want, total), purse / Balance.VillageGrain);
+                    if (take >= 1)
+                        foreach (var h in sellers)
+                        {
+                            float q = (h.Stock[(int)Good.Grain] - GrainKeep(h)) * take / total;
+                            float v = q * Balance.VillageGrain;
+                            h.Stock[(int)Good.Grain] -= q; b.Stock[(int)Good.Grain] += q; want -= q; purse -= v;
+                            ShopPays(b, v);
+                            var seller = Purse(h); Share(seller.Take(1).ToList(), v);
+                        }
                     // the king's granary sells what it can spare, and lets a shop with an empty purse have some on credit
                     float credit = b.DebtTo < 0 || b.DebtTo == CrownCredit ? Math.Max(0, Balance.CreditLimit - b.Debt) : 0;
                     var bv = VillageOf(b);
@@ -227,7 +234,7 @@ namespace MedievalTown.Simulation
                         if (q >= 1)
                         {
                             q = TakeLocal(bv, Good.Grain, q); float v = q * Policy.GrainPrice, cash = Math.Min(v, purse), owed = v - cash;
-                            if (cash > 0) { Pay(staff, cash); PayLord(dom, cash, "Grain sold to shops"); }
+                            if (cash > 0) { ShopPays(b, cash); PayLord(dom, cash, "Grain sold to shops"); }
                             if (owed > 0) { b.Debt += owed; b.DebtTo = CrownCredit; }
                             b.Stock[(int)Good.Grain] += q;
                         }
@@ -250,7 +257,7 @@ namespace MedievalTown.Simulation
                         if (q <= 0.05f) continue;
                         float v = q * unit, cash = Math.Min(v, purse), owed = v - cash;
                         src.Stock[(int)g] -= q; b.Stock[(int)g] += q; want -= q; purse -= cash;
-                        if (cash > 0) { Pay(staff, cash); Takings(src, cash); }
+                        if (cash > 0) { ShopPays(b, cash); Takings(src, cash); }
                         if (owed > 0) { b.Debt += owed; b.DebtTo = src.Id; }
                     }
                     if (b.Debt < 0.001f) b.DebtTo = -1;
@@ -291,6 +298,17 @@ namespace MedievalTown.Simulation
                 double treat = cash > 6 ? 0.6 : cash > 2 ? 0.4 : 0.15;
                 if (h.Stock[(int)Good.Meat] < 0.5f && Chance(treat)) cash -= Buy(h, purse, BuildingType.Butcher, Good.Meat, need, cash * 0.5f);
                 if (h.Stock[(int)Good.Fish] < 0.5f && Chance(treat)) cash -= Buy(h, purse, BuildingType.Fishpond, Good.Fish, need, cash * 0.5f);
+                // a family with coin put by keeps a better table: part of it bread, meat and fish from the shops, the more the richer
+                float perHead = cash / Math.Max(1, purse.Count);
+                float well = Math.Max(0, Math.Min(1, (perHead - Balance.TreatsFrom) / (Balance.TreatsFull - Balance.TreatsFrom)));
+                if (well > 0.01f)
+                {
+                    if (h.Stock[(int)Good.Bread] < need * 2) cash -= Buy(h, purse, BuildingType.Bakehouse, Good.Bread, need * 2 * well * 0.5f, cash * 0.3f);
+                    if (h.Stock[(int)Good.Meat] < need) cash -= Buy(h, purse, BuildingType.Butcher, Good.Meat, need * well * 0.3f, cash * 0.25f);
+                    if (h.Stock[(int)Good.Fish] < need) cash -= Buy(h, purse, BuildingType.Fishpond, Good.Fish, need * well * 0.3f, cash * 0.25f);
+                    // and better clothes: another length of cloth when they've coin to spare
+                    if (well > 0.5f && h.Stock[(int)Good.Cloth] < 0.7f * folk) cash -= Buy(h, purse, BuildingType.Weaver, Good.Cloth, 1, cash * 0.5f);
+                }
             }
         }
 
@@ -299,7 +317,7 @@ namespace MedievalTown.Simulation
         {
             if (q <= 0.1f || budget <= 0.05f) return 0;
             var shop = shopType == BuildingType.MerchantHouse ? null : ShopFor(home, shopType, g, Math.Min(q, 1f));
-            float price = shop != null ? shop.Def.Price : 0;
+            float price = shop != null ? AskPrice(shop) : 0;
             if (shop == null)
             {
                 // the barony's merchant may have some on his cart from the capital
@@ -334,6 +352,6 @@ namespace MedievalTown.Simulation
         }
         public bool Ragged(Building home) { return home != null && IsPeasantHome(home.Type) && home.Stock[(int)Good.Cloth] < home.Residents.Count * 0.15f; }
 
-        void CloseShopWeek() { foreach (var b in Buildings) { if (!b.Def.IsShop && b.Type != BuildingType.MerchantHouse) continue; b.LastSales = b.WeekSales; b.WeekSales = 0; } }
+
     }
 }

@@ -73,6 +73,16 @@ namespace MedievalTown.Simulation
                 b.Stock = Fit(b.Stock); b.Delivered = Fit(b.Delivered);
                 if (b.Residents == null) b.Residents = new List<int>();
                 if (b.Employees == null) b.Employees = new List<int>();
+                // older saves: the freeman family already working a shop holds it, with nothing owed
+                if (b.Def.IsShop && b.OwnerId < 0 && b.Wage <= 0 && b.Employees.Count > 0)
+                {
+                    var o = b.Employees.Select(GetCitizen).FirstOrDefault(p => p != null && p.Rank == Rank.Freeman && !p.IsChild);
+                    if (o != null)
+                    {
+                        b.OwnerId = o.Id; b.Wage = Policy.FreeWage; b.Desired = b.Def.Workers;
+                        foreach (var id in b.Employees) { var p = GetCitizen(id); if (p != null && p != o && p.HomeId == o.HomeId) p.FamilyHand = true; }
+                    }
+                }
             }
         }
 
@@ -412,6 +422,7 @@ namespace MedievalTown.Simulation
             }
             if (b.Type == BuildingType.VillageCross) VillageLost(b);
             if (b.Type == BuildingType.Manor) foreach (var bar in Baronies.Where(x => x.ManorId == b.Id).ToList()) EndBarony(bar, "lost its manor");
+            if (b.Def.IsShop) { var o = OwnerOf(b); if (o != null) { o.Coin += Math.Max(0, b.Coin); b.Coin = 0; } foreach (var p in People) if (p.WorkId == b.Id) p.FamilyHand = false; }
             if (b.Coin > 0 || b.ChestGrain > 0) { Receive(b.Coin, b.ChestGrain); b.Coin = 0; b.ChestGrain = 0; }
             Buildings.Remove(b);
             MarkDirty(b);

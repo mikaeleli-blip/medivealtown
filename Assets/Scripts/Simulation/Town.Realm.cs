@@ -571,19 +571,22 @@ namespace MedievalTown.Simulation
             Taxes.Clear();
         }
 
-        /// <summary>Martinmas, the start of winter: the crown's tallage is assessed on every serf household.</summary>
+        /// <summary>Martinmas, the start of winter: the crown's tallage is assessed on every serf household, by its means:
+        /// the set sum on every family, and a share of the coin a well-off family has put by.</summary>
         void Martinmas()
         {
             if (Policy.Tallage <= 0) return;
-            int n = 0;
+            int n = 0; float total = 0;
             foreach (var h in TaxHouses.Where(b => b.Type == BuildingType.Cottage).ToList())
             {
                 var head = HeadOf(h);
                 if (head == null || head.Rank == Rank.Freeman) continue;
-                Assess(h, Policy.Tallage, 0); n++;
-                foreach (var p in h.Residents.Select(GetCitizen).Where(p => p != null && !p.IsChild)) p.Loyalty = Clamp(p.Loyalty - Policy.Tallage * 2, 0, 100);
+                float means = h.Residents.Select(GetCitizen).Where(p => p != null).Sum(p => p.Coin);
+                float t = Policy.Tallage + Math.Max(0, means - Balance.TallageFree) * Balance.TallageOnMeans;
+                Assess(h, t, 0); n++; total += t;
+                foreach (var p in h.Residents.Select(GetCitizen).Where(p => p != null && !p.IsChild)) p.Loyalty = Clamp(p.Loyalty - Policy.Tallage * 2 - (t - Policy.Tallage) * 0.5f, 0, 100);
             }
-            AddLog("Martinmas: the crown's tallage of " + Money(Policy.Tallage) + " was laid on " + n + " serf families. The reeves will collect it.", LogKind.Info);
+            AddLog("Martinmas: the crown's tallage was laid on " + n + " serf families, " + Money(total) + " in all (" + Money(Policy.Tallage) + " a family, and more from those with coin put by). The reeves will collect it.", LogKind.Info);
         }
     }
 }

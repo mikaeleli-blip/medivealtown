@@ -188,6 +188,17 @@ namespace MedievalTown.Simulation
         public float DomainWants(int domain, Good g) { float n = 0; foreach (var v in Villages) if (DomainOf(v) == domain && v.Wants != null && v.Wants.Length > (int)g) n += v.Wants[(int)g]; return n; }
 
         /// <summary>Days of grain a village has in its barn, its lord's granary (its share) and its families' pantries.</summary>
+        /// <summary>Days the food in a village's homes, its barns and the lord's stores it draws on would feed it.</summary>
+        public float FoodAhead(Village v)
+        {
+            if (v == null) return 0;
+            float need = 0, pantry = 0;
+            foreach (var h in HousesOf(v)) { need += Needs(h); pantry += h.Stock[(int)Good.Grain] * Balance.GrainFeeds + h.Stock[(int)Good.Flour] + h.Stock[(int)Good.Bread] + h.Stock[(int)Good.Meat] + h.Stock[(int)Good.Fish]; }
+            if (need <= 0) return 999;
+            float stores = 0; foreach (var b in LocalStores(v)) stores += b.Stock[(int)Good.Grain] * Balance.GrainFeeds + b.Stock[(int)Good.Flour];
+            foreach (var p in People) if (p.Hungry > 1 && !p.IsChild && VillageOf(p) == v) return 0;   // folk there are going hungry already
+            return (pantry + stores) / need;
+        }
         public float GrainDays(Village v)
         {
             float need = 0, pantry = 0;
@@ -316,7 +327,7 @@ namespace MedievalTown.Simulation
         /// <summary>A shop only sells to a merchant what its own village won't buy: it keeps two weeks of what it sells, and a third of its stock.</summary>
         float ShopSpare(Building shop, Good g)
         {
-            float price = shop.Def.Price > 0 ? shop.Def.Price : PriceOf(g);
+            float price = shop.Def.Price > 0 ? AskPrice(shop) : PriceOf(g);
             float keep = Math.Max(shop.Def.Cap * 0.3f, shop.LastSales / price * 2);
             return Math.Max(0, shop.Stock[(int)g] - keep);
         }

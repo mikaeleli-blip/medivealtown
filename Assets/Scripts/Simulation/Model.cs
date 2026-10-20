@@ -41,6 +41,15 @@ namespace MedievalTown.Simulation
         public int VillageId = -1;       // the village it belongs to
         public float WeekSales, LastSales; // a shop's takings this week and last
         public float Debt; public int DebtTo = -1;   // what a shop owes the supplier who let it have goods on credit
+        // A trade as a business: the crown runs it until a freeman family takes it up, paying the entry fine
+        public int OwnerId = -1;         // the freeman who holds the shop (-1: the crown runs it)
+        public float Wage;               // a day's pay for a hired hand
+        public int Desired = -1;         // hands the shop wants (owner and family included); -1 until first decided
+        public float Price;              // what it asks for what it sells (0: the usual price)
+        public float WeekCosts, LastProfit;   // what it paid out this week, and last week's takings less costs
+        public int LossWeeks;            // weeks running it has lost money
+        public float FineOwed;           // what's left of the entry fine, paid to the lord week by week
+        public int MissedWeeks;          // weeks the fine went unpaid; four and the lord takes the shop back
         public int Mask;                 // walls: which neighbours they join (1 north, 2 east, 4 south, 8 west; 16: the north one is a tower or gate)
 
         public BuildingDef Def { get { return Defs.Get(Type); } }
@@ -90,6 +99,7 @@ namespace MedievalTown.Simulation
         public int BreadDay = -999, MeatDay = -999, FishDay = -999;   // last ate bought bread, meat, fish
         public int Pregnant;             // days to go
         public bool WasFree;             // a freeman serving as reeve, who goes back to being free when his year's done
+        public bool FamilyHand;          // works the family's shop for no wage
         public float Honesty = 0.7f;     // 0..1: officers below about 0.6 take more than their due
         public string Name { get { return First + " " + Family; } }
         public bool IsChild { get { return Age < Balance.AdultAge; } }

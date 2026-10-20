@@ -319,7 +319,7 @@ namespace MedievalTown.Game
             float w = 196;
             string blurb = d.Blurb ?? "";
             string extra = d.Workers > 0 ? "Up to " + d.Workers + (d.WorkerRank == Rank.Freeman ? " freemen" : " workers") + " · " + M(T.Policy.FreeWage) + " a day from the crown" : null;
-            if (d.IsShop) extra = "Run by a freeman family for itself · " + Defs.GoodNames[(int)d.Sells.Value].ToLower() + " at " + M(d.Price) + " · " + Mathf.RoundToInt(T.Policy.MarketToll * 100) + "% toll";
+            if (d.IsShop) extra = "Run by the lord until a freeman family pays its entry fine · " + Defs.GoodNames[(int)d.Sells.Value].ToLower() + " at " + M(d.Price) + " · " + Mathf.RoundToInt(T.Policy.MarketToll * 100) + "% toll";
             float h = 30 + Ui.WrappedHeight(blurb, w - 14) + (extra != null ? 11 : 0);
             var r = new Rect(Mathf.Clamp(anchor.x - 60, 4, W - w - 4), anchor.y - h, w, h);
             Ui.Tip(r);
@@ -993,11 +993,21 @@ namespace MedievalTown.Game
         void ShopPanel(Building b)
         {
             var d = b.Def;
-            Row("Sells", Defs.GoodNames[(int)d.Sells.Value] + " at " + M(d.Price) + (d.Sells == Good.Cloth ? " a length" : d.Sells == Good.Beasts ? " a beast" : ""));
+            var owner = T.OwnerOf(b);
+            if (owner != null) PersonLine(owner, "Held by");
+            else Row("Held by", (T.DomainOf(b) < 0 ? "the crown" : "the baron") + ", until a freeman family pays the " + M(T.EntryFine(b)) + " entry fine (a quarter down)", Ui.InkSoft);
+            float ask = T.AskPrice(b);
+            Row("Sells", Defs.GoodNames[(int)d.Sells.Value] + " at " + M(ask) + (d.Sells == Good.Cloth ? " a length" : d.Sells == Good.Beasts ? " a beast" : "") + (Town.SellsToFolk(b.Type) && Mathf.Abs(ask - d.Price) > 0.004f ? " (usually " + M(d.Price) + ")" : ""),
+                ask > d.Price * 1.2f ? Ui.Warn : Ui.Ink);
             if (d.Buys.HasValue) Row("Buys", Defs.GoodNames[(int)d.Buys.Value] + (d.Buys == Good.Grain ? " from serf families, at " + M(Balance.VillageGrain) : d.Buys == Good.Beasts ? " from the pastures" : " from the sheepfolds"));
             Row("Takings last week", M(b.LastSales) + (b.WeekSales > 0.01f ? " (" + M(b.WeekSales) + " so far)" : ""));
+            Row("Profit last week", M(b.LastProfit), b.LastProfit < 0 ? Ui.Warn : Ui.Ink);
+            Row("In the till", M(b.Coin));
+            int hired = T.HiredHands(b).Count, family = b.Employees.Count - hired - (owner != null && b.Employees.Contains(owner.Id) ? 1 : 0);
+            Row("Hands", b.Employees.Count + " of " + d.Workers + (family > 0 ? " · " + family + " family" : "") + (hired > 0 ? " · " + hired + " hired at " + M(T.WageOf(b)) + " a day" : ""));
+            if (b.FineOwed > 0.01f) Row("Entry fine owed", M(b.FineOwed) + (b.MissedWeeks > 0 ? " · " + b.MissedWeeks + " weeks behind" : ""), b.MissedWeeks > 0 ? Ui.Warn : Ui.Ink);
             if (b.Debt > 0.05f) Row("Owes its supplier", M(b.Debt), Ui.Warn);
-            if (b.Employees.Count == 0) Para("No freeman family has taken it up. Families come for the work when there's a house for them.", Ui.Warn);
+            if (b.Employees.Count == 0) Para(owner == null ? "Nobody works it yet. The lord hires a freeman to run it when there's one free; families come for work when there's a house for them." : "Nobody works it.", Ui.Warn);
             else if (!T.TradeNeeded(b))
             {
                 string why = b.Stock[(int)d.Sells.Value] >= d.Cap ? "Plenty on hand; waiting for buyers."

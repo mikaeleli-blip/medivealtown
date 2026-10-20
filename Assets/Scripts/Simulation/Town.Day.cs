@@ -187,6 +187,7 @@ namespace MedievalTown.Simulation
 
             Milling();
             Spoilage();
+            ShopsMorning();
             Shopping();
             Eating(si);
             Warmth(si);
@@ -220,6 +221,7 @@ namespace MedievalTown.Simulation
             Flight();
             Rehouse(); AssignStrips(); Hire();
             Procure();
+            ShopPayroll();
         }
 
         /// <summary>Strips in a village with a reeve in office are worked better.</summary>
@@ -693,14 +695,15 @@ namespace MedievalTown.Simulation
             foreach (var b in OfType(BuildingType.Alehouse)) b.SoldToday = 0;
             var houses = OfType(BuildingType.Alehouse).Where(b => b.Employees.Count > 0).ToList();
             if (houses.Count == 0 || IsSunday) return;
-            foreach (var p in People.Where(p => !p.IsChild && !RoyalHousehold(p) && p.Rank != Rank.Priest && p.Coin >= Balance.AlePrice + 0.3f))
+            foreach (var p in People.Where(p => !p.IsChild && !RoyalHousehold(p) && p.Rank != Rank.Priest && p.Coin >= 0.45f))
             {
                 if (Day - p.AleDay < 3 || !Chance(0.35)) continue;
                 var house = houses.Where(h => h.Stock[(int)Good.Ale] >= 1).OrderBy(h => h.SoldToday).FirstOrDefault();
                 if (house == null) break;
+                float cup = AskPrice(house); if (p.Coin < cup + 0.3f) continue;
                 house.Stock[(int)Good.Ale] -= 1; house.SoldToday++;
-                p.Coin -= Balance.AlePrice; p.AleDay = Day;
-                Takings(house, Balance.AlePrice);
+                p.Coin -= cup; p.AleDay = Day;
+                Takings(house, cup);
             }
         }
 
@@ -837,7 +840,7 @@ namespace MedievalTown.Simulation
             {
                 // up to the harvest from what families can spare; on up to the court's year only from big surpluses
                 float want = CourtYear - StoreStock(Good.Grain), urgent = CourtHold - StoreStock(Good.Grain);
-                foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0 && DomainOf(b) < 0).ToList())
+                foreach (var h in Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count > 0 && DomainOf(b) < 0).OrderByDescending(b => b.Stock[(int)Good.Grain] - GrainKeep(b)).ToList())
                 {
                     if (want < 1 || Coin - Policy.CoinReserve * 0.5f < Balance.VillageGrain) break;
                     float spare = FamilySpare(h);
@@ -868,7 +871,7 @@ namespace MedievalTown.Simulation
                 if (want < 5) continue;
                 var buyers = Purse(h);
                 int dom = DomainOf(h);
-                foreach (var s in sellers.Where(x => DomainOf(x) == dom).OrderBy(x => Dist2(x, h)))
+                foreach (var s in sellers.Where(x => DomainOf(x) == dom).OrderBy(x => x.VillageId == h.VillageId ? 0 : 1).ThenByDescending(x => x.Stock[(int)Good.Grain] - GrainKeep(x)))   // whoever has most to spare
                 {
                     if (want < 1) break;
                     float spare = s.Stock[(int)Good.Grain] - GrainKeep(s);
@@ -898,7 +901,7 @@ namespace MedievalTown.Simulation
         void Weekly()
         {
             WeeklyAssessment();
-            CloseShopWeek();
+            ShopsWeekly();
             Newcomers();
             LastIn = WeekIn; LastOut = WeekOut; WeekIn = WeekOut = 0;
             LastTaxCoin = WeekTaxCoin; LastTaxGrain = WeekTaxGrain; WeekTaxCoin = WeekTaxGrain = 0;

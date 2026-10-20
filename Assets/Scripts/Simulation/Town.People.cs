@@ -193,7 +193,26 @@ namespace MedievalTown.Simulation
             return best ?? first;
         }
 
-        /// <summary>Freemen take up the trades: the woodward's lodge, the quarry, the mill and the alehouse.</summary>
+        /// <summary>Places a building will take a freeman on for: the crown's works while there are hands short, a shop for the
+        /// hands it wants (an owned shop only with a few days' wages in hand for each hired hand).</summary>
+        public int OpenPlaces(Building b)
+        {
+            if (!b.Built || b.Def.Workers <= 0) return 0;
+            if (!b.Def.IsShop) return Math.Max(0, b.Def.Workers - b.Employees.Count);
+            int want = Math.Min(b.Def.Workers, b.Desired < 0 ? b.Def.Workers : b.Desired);
+            int open = want - b.Employees.Count;
+            if (open > 0 && b.OwnerId >= 0)
+            {
+                int hired = HiredHands(b).Count;
+                int afford = (int)(Math.Max(0, b.Coin) / (WageOf(b) * 4f)) - hired;
+                open = Math.Min(open, Math.Max(0, afford));
+            }
+            return Math.Max(0, open);
+        }
+
+        /// <summary>Who works where. Shops go to freeman families who can pay the entry fine; an owner's wife and grown children
+        /// work the family shop; then the places the crown and the shops will pay for are filled from freemen without work,
+        /// the mill first, folk from the same lands first.</summary>
         public void Hire()
         {
             foreach (var b in Buildings)
@@ -201,38 +220,73 @@ namespace MedievalTown.Simulation
                 if (!b.Built || b.Def.Workers <= 0) { b.Employees.Clear(); continue; }
                 b.Employees.RemoveAll(id => { var p = GetCitizen(id); return p == null || p.WorkId != b.Id; });
             }
-            foreach (var p in People) if (p.WorkId >= 0 && GetBuilding(p.WorkId) == null) p.WorkId = -1;
-            // a freeman standing idle at the crown's woods or quarry takes an empty place at the mill or a shop in his own lands
+            foreach (var p in People) if (p.WorkId >= 0 && GetBuilding(p.WorkId) == null) { p.WorkId = -1; p.FamilyHand = false; }
+            foreach (var p in People) if (p.FamilyHand && p.WorkId < 0) p.FamilyHand = false;
+            ShopHeirs();
+            AssignOwners();
+
+            // the family works the family shop, as many as there's work for
+            foreach (var b in Buildings)
+            {
+                if (!b.Built || !b.Def.IsShop || b.OwnerId < 0) continue;
+                var o = GetCitizen(b.OwnerId); if (o == null) continue;
+                int want = Math.Min(b.Def.Workers, b.Desired < 0 ? b.Def.Workers : b.Desired);
+                if (b.Employees.Count >= want) continue;
+                var sp = GetCitizen(o.PartnerId);
+                foreach (var k in People.Where(c => !c.IsChild && c.HomeId == o.HomeId && c.Id != o.Id && c.Rank == Rank.Freeman && c.WorkId < 0 && c.Age < 62 && c.Health > 30 &&
+                                                    (c.Id == o.PartnerId || c.MotherId == o.Id || c.FatherId == o.Id || (sp != null && (c.MotherId == sp.Id || c.FatherId == sp.Id)))).ToList())
+                {
+                    if (b.Employees.Count >= want) break;
+                    k.WorkId = b.Id; k.FamilyHand = true; b.Employees.Add(k.Id);
+                }
+            }
+
+            // the places there are: the crown's works, and the shops (a shop only takes on a hand it has the wages for)
+            var places = new List<KeyValuePair<Building, int>>();
+            foreach (var b in Buildings)
+            {
+                if (!b.Built || b.Def.Workers <= 0) continue;
+                int open = OpenPlaces(b);
+                if (open > 0) places.Add(new KeyValuePair<Building, int>(b, open));
+            }
+            Func<Building, int> rank = b => b.Type == BuildingType.Mill ? 0 : !TradeNeeded(b) ? 9 : b.Type == BuildingType.Bakehouse ? 1 : b.Def.IsShop ? 2 : b.Type == BuildingType.Woodcutter ? 3 : b.Type == BuildingType.Quarry ? 4 : 5;
+            places = places.OrderBy(x => rank(x.Key)).ThenBy(x => x.Key.Id).ToList();
+
+            // a freeman standing idle at the crown's woods or quarry takes a place with work in his own lands
             foreach (var w in Buildings.Where(b => b.Built && (b.Type == BuildingType.Woodcutter || b.Type == BuildingType.Quarry) && b.Employees.Count > 0 && !TradeNeeded(b)).ToList())
                 foreach (var id in w.Employees.ToList())
                 {
                     var p = GetCitizen(id); if (p == null || p.Rank != Rank.Freeman) continue;
                     int dom = DomainOf(w);
-                    if (!Buildings.Any(b => b.Built && (b.Def.IsShop || b.Type == BuildingType.Mill) && b.Employees.Count < b.Def.Workers && DomainOf(b) == dom && TradeNeeded(b))) break;
+                    if (!places.Any(x => x.Key != w && rank(x.Key) < 9 && DomainOf(x.Key) == dom)) break;
                     w.Employees.Remove(id); p.WorkId = -1;
                 }
             var free = People.Where(p => !p.IsChild && p.Rank == Rank.Freeman && p.WorkId < 0 && p.Age < 62 && p.Health > 30).OrderBy(p => p.Female ? 1 : 0).ToList();
-            // the mill can't stand idle: if no freeman is free, one leaves a lesser trade for it
+            // the mill can't stand idle: if no freeman is free, an idle quarryman or a shop's hired hand leaves for it
             foreach (var mill in Buildings.Where(b => b.Built && b.Type == BuildingType.Mill && b.Employees.Count == 0))
             {
                 if (free.Count > 0) break;
-                var shop = Buildings.Where(b => b.Built && (b.Def.IsShop && b.Type != BuildingType.Bakehouse || b.Type == BuildingType.Woodcutter || b.Type == BuildingType.Quarry) && b.Employees.Count > 0)
-                                    .OrderBy(b => b.Def.IsShop ? 1 : 0).ThenBy(b => TradeNeeded(b) ? 1 : 0).ThenBy(b => b.LastSales).FirstOrDefault();   // an idle quarryman before a shopkeeper
-                if (shop == null) break;
-                var p = GetCitizen(shop.Employees[0]); if (p == null || p.Rank != Rank.Freeman) break;
-                shop.Employees.Remove(p.Id); p.WorkId = -1; free.Add(p);
+                Citizen p = null; Building from = null;
+                foreach (var b in Buildings.Where(b => b.Built && b.Employees.Count > 0 && (b.Type == BuildingType.Woodcutter || b.Type == BuildingType.Quarry || b.Def.IsShop && b.Type != BuildingType.Bakehouse))
+                                           .OrderBy(b => b.Def.IsShop ? 1 : 0).ThenBy(b => TradeNeeded(b) ? 1 : 0).ThenBy(b => b.LastSales))
+                {
+                    var c = (b.Def.IsShop ? HiredHands(b) : Staff(b)).FirstOrDefault(x => x.Rank == Rank.Freeman);
+                    if (c != null) { p = c; from = b; break; }
+                }
+                if (p == null) break;
+                from.Employees.Remove(p.Id); p.WorkId = -1; free.Add(p);
             }
-            // the mill first: the whole village needs it
-            // the mill first, then the trades with work waiting; the crown's works when they're idle come last
-            foreach (var b in Buildings.Where(b => b.Built && b.Def.Workers > 0).OrderBy(b => b.Type == BuildingType.Mill ? 0 : !TradeNeeded(b) ? 9 : b.Type == BuildingType.Bakehouse ? 1 : b.Type == BuildingType.Woodcutter ? 2 : b.Type == BuildingType.Quarry ? 3 : b.Def.IsShop ? 4 : 5).ThenBy(b => b.Id))
+            foreach (var kv in places)
             {
-                while (b.Employees.Count < b.Def.Workers && free.Count > 0)
+                var b = kv.Key; int open = kv.Value;
+                for (int k = 0; k < open && free.Count > 0; k++)
                 {
                     // folk from the same lands first; the alewife: brewing was women's work
                     int dom = DomainOf(b);
                     var p = free.OrderBy(x => DomainOf(x) == dom ? 0 : 1).ThenBy(x => b.Type == BuildingType.Alehouse ? (x.Female ? 0 : 1) : (x.Female ? 1 : 0)).First();
                     free.Remove(p);
-                    p.WorkId = b.Id; b.Employees.Add(p.Id);
+                    p.WorkId = b.Id; p.FamilyHand = false; b.Employees.Add(p.Id);
+                    if (b.Def.IsShop && b.Wage <= 0) b.Wage = Policy.FreeWage;
                 }
             }
         }
@@ -356,9 +410,12 @@ namespace MedievalTown.Simulation
             if (AverageLoyalty < 45) return;
             var empty = Buildings.Where(b => b.Built && IsPeasantHome(b.Type) && b.Residents.Count == 0).ToList();
             if (empty.Count == 0) return;
-            int openJobs = Buildings.Where(b => b.Built && b.Def.Workers > 0).Sum(b => b.Def.Workers - b.Employees.Count);
-            var freeHouse = empty.FirstOrDefault(b => b.Type == BuildingType.FreeHouse);
-            bool free = openJobs > 0 && (freeHouse != null || !People.Any(p => p.Rank == Rank.Freeman && p.WorkId < 0 && !p.IsChild));
+            // a freeman's family asks first whether there's work in those lands, and bread to be had
+            bool idleFree = People.Any(p => p.Rank == Rank.Freeman && p.WorkId < 0 && !p.IsChild && p.Age < 62);
+            var freeHouse = empty.Where(b => (b.Type == BuildingType.FreeHouse || !idleFree) && FoodAhead(VillageOf(b) ?? Capital) >= 8)
+                                 .OrderBy(b => b.Type == BuildingType.FreeHouse ? 0 : 1)
+                                 .FirstOrDefault(b => Buildings.Any(w => DomainOf(w) == DomainOf(b) && OpenPlaces(w) > 0));
+            bool free = freeHouse != null;
             // a serf family only comes to an empty cottage in a village with a strip field going spare: no land, no living
             var cottages = empty.Where(b => b.Type == BuildingType.Cottage && SpareStrips(b.VillageId) > 0).ToList();
             if (!free && cottages.Count == 0) return;
@@ -371,7 +428,7 @@ namespace MedievalTown.Simulation
             int n = Rng.Next(0, 3);
             for (int k = 0; k < n; k++) Child(mom, dad, Rnd(0.5f, 10));
             Arrived += 2 + n;
-            var home = rank == Rank.Freeman ? (freeHouse ?? empty[0]) : cottages[Rng.Next(cottages.Count)];
+            var home = rank == Rank.Freeman ? freeHouse : cottages[Rng.Next(cottages.Count)];
             var hv = VillageOf(home);
             // they bring enough to see them to their first harvest, roughly
             home.Stock[(int)Good.Cloth] += 2 + n;
