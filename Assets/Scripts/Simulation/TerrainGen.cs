@@ -87,13 +87,15 @@ namespace MedievalTown.Simulation
                 int side0 = r.Next(2) == 0 ? -1 : 1;
                 return centre + side0 * (near + r.Next(0, Math.Max(1, span)));
             };
-            if (cols > 400)
+            int farSpan = cols / 2 - 150;
+            if (cols > 600)
             {
-                int span = cols / 2 - 150;
-                River(cx - 130 - r.Next(0, Math.Max(1, span)), 5 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 11);
-                River(cx + 140 + r.Next(0, Math.Max(1, span)), 5 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 12);
+                River(cx - 130 - r.Next(0, Math.Max(1, farSpan)), 5 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 11);
+                River(cx + 140 + r.Next(0, Math.Max(1, farSpan)), 5 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 12);
             }
-            if (rows > 300 && r.NextDouble() < 0.7)
+            else if (cols > 400 && r.NextDouble() < 0.5)
+                River(cx + (r.Next(2) == 0 ? -1 : 1) * (150 + r.Next(0, Math.Max(1, farSpan - 20))), 5 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 11);
+            if (rows > 420 && r.NextDouble() < 0.7)
                 RiverAcross(Spot(cy, 100, rows / 2 - 115), 4 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 31);
 
             // Lakes: one handy to the south-east of town, others further out
