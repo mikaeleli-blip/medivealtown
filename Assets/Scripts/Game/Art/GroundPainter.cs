@@ -48,6 +48,24 @@ namespace MedievalTown.Game.Art
             for (int ty = ty0; ty < ty0 + th; ty++) for (int tx = tx0; tx < tx0 + tw; tx++) PaintOverlay(tx, ty, si);
         }
 
+        /// <summary>A quick flat coat for a chunk that's just come into view: each tile its plain colour, until it's painted properly.</summary>
+        public void QuickChunk(PixelCanvas c, int tx0, int ty0, int tw, int th, int si)
+        {
+            var grass = PixelCanvas.C(Grass[si][0]); var hill = PixelCanvas.C(HillColors[si][0]);
+            var water = PixelCanvas.C(si == 3 ? "#bcd8e6" : "#3b7cc0"); var road = PixelCanvas.C(si == 3 ? "#cbbfa9" : "#b08a5a");
+            for (int ty = 0; ty < th; ty++)
+                for (int tx = 0; tx < tw; tx++)
+                {
+                    int x = tx0 + tx, y = ty0 + ty; byte t = town.TerrainAt(x, y);
+                    var col = town.IsRoad(x, y) ? road : t == Tile.Water ? water : t == Tile.Hill ? hill : grass;
+                    for (int py = 0; py < 16; py++)
+                    {
+                        int row = (c.H - 1 - (ty * 16 + py)) * c.W + tx * 16;
+                        for (int px = 0; px < 16; px++) c.Px[row + px] = col;
+                    }
+                }
+        }
+
         /// <summary>Repaints a tile and its neighbours (banks and road joins depend on neighbours) in a chunk's canvas.</summary>
         public void PaintAround(PixelCanvas c, int tx0, int ty0, int x, int y, int si)
         {
