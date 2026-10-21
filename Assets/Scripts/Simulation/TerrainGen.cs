@@ -39,7 +39,7 @@ namespace MedievalTown.Simulation
 
     public static class TerrainGen
     {
-        /// <summary>Builds the starting map: a winding river west of the town site, a creek to the east, lakes, plateau hills,
+        /// <summary>Builds the starting map: a winding river well west of the town site, a creek well to the east, lakes, plateau hills,
         /// woods and boulders, with open meadow around the town site. Everything is placed relative to the town site,
         /// so the map can be any size.</summary>
         public static byte[] Generate(int seed, int cols, int rows)
@@ -64,8 +64,9 @@ namespace MedievalTown.Simulation
                     for (int xx = x0; xx < x0 + w; xx++) if (inb(xx, y)) T[I(xx, y)] = Tile.Water;
                 }
             };
-            River(cx - 23, 5.5, 3, r.NextDouble() * 6.28, 0);
-            River(cx + 36 + r.Next(-4, 5), 4.0, 2, r.NextDouble() * 6.28, 7);
+            // far enough out that the town has a wide plain to grow into before it has to cross water
+            River(cx - 58 + r.Next(-4, 5), 6.0, 3, r.NextDouble() * 6.28, 0);
+            River(cx + 66 + r.Next(-4, 5), 4.5, 2, r.NextDouble() * 6.28, 7);
 
             // Lakes: one handy to the south-east of town, others further out
             Action<int, int, double, double> Lake = (lx, ly, rx, ry) =>
