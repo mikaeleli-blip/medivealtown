@@ -225,9 +225,11 @@ namespace MedievalTown.Game
                     c.Season = si; Upload(c); c.Sr.enabled = true;
                 }
             // forget the chunks longest out of view
-            if (chunks.Count > MaxChunks)
+            int inView = ((vt.xMax - 1) / ChunkTiles - vt.xMin / ChunkTiles + 1) * ((vt.yMax - 1) / ChunkTiles - vt.yMin / ChunkTiles + 1);
+            int keep = Mathf.Max(MaxChunks, inView + 24);
+            if (chunks.Count > keep)
             {
-                foreach (var kv in chunks.OrderBy(kv => kv.Value.Seen).Take(chunks.Count - MaxChunks).ToList())
+                foreach (var kv in chunks.OrderBy(kv => kv.Value.Seen).Take(chunks.Count - keep).ToList())
                 {
                     if (kv.Value.Seen == frameNo) break;
                     Destroy(kv.Value.Sr.gameObject); Destroy(kv.Value.Tex); chunks.Remove(kv.Key);

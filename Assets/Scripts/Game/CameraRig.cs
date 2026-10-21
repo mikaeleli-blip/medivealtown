@@ -5,15 +5,16 @@ using UnityEngine;
 namespace MedievalTown.Game
 {
     /// <summary>
-    /// Pixel-perfect orthographic camera. Zoom is a whole number of screen pixels per art pixel,
-    /// so the pixel art never blurs or shimmers.
+    /// Pixel-perfect orthographic camera. Zoom is a whole number of screen pixels per art pixel, so the pixel art never
+    /// blurs or shimmers, except the furthest-out step, half a screen pixel per art pixel, for seeing the wider country.
     /// </summary>
     [RequireComponent(typeof(Camera))]
     public sealed class CameraRig : MonoBehaviour
     {
         public Camera Cam { get; private set; }
-        public int Zoom { get; private set; }
-        public int MinZoom = 1, MaxZoom = 6;
+        public float Zoom { get { return Levels[level]; } }
+        static readonly float[] Levels = { 0.5f, 1, 2, 3, 4, 5, 6 };
+        int level;
 
         // Camera centre in prototype pixel space (x right, y down)
         Vector2 center;
@@ -28,12 +29,12 @@ namespace MedievalTown.Game
             Cam.clearFlags = CameraClearFlags.SolidColor;
             Cam.backgroundColor = new Color32(28, 20, 14, 255);
             Cam.nearClipPlane = 0.1f; Cam.farClipPlane = 100f;
-            Zoom = Mathf.Clamp(Mathf.RoundToInt(Screen.height / 360f), 2, MaxZoom);
+            level = Mathf.Clamp(Mathf.RoundToInt(Screen.height / 360f), 2, Levels.Length - 1);
             center = new Vector2(WorldW / 2, WorldH / 2);
         }
 
         /// <summary>Visible size in art pixels.</summary>
-        public Vector2 ViewSize { get { return new Vector2(Screen.width / (float)Zoom, Screen.height / (float)Zoom); } }
+        public Vector2 ViewSize { get { return new Vector2(Screen.width / Zoom, Screen.height / Zoom); } }
         /// <summary>Top-left of the view in art pixels.</summary>
         public Vector2 ViewOrigin { get { var v = ViewSize; return new Vector2(center.x - v.x / 2, center.y - v.y / 2); } }
 
@@ -44,10 +45,10 @@ namespace MedievalTown.Game
 
         public void ZoomAt(int dir, Vector2 screenPos)
         {
-            int nz = Mathf.Clamp(Zoom + dir, MinZoom, MaxZoom);
-            if (nz == Zoom) return;
+            int nl = Mathf.Clamp(level + dir, 0, Levels.Length - 1);
+            if (nl == level) return;
             var before = ScreenToPixel(screenPos);
-            Zoom = nz;
+            level = nl;
             var after = ScreenToPixel(screenPos);
             center += before - after;
             Clamp();
@@ -72,7 +73,7 @@ namespace MedievalTown.Game
             Clamp();
             Cam.orthographicSize = Screen.height / (2f * Pixels.PerUnit * Zoom);
             // Snap the view's top-left to whole screen pixels so art pixels land on the pixel grid
-            float step = 1f / Zoom;
+            float step = 1f / Zoom;   // whole screen pixels (at half zoom, pairs of art pixels)
             var o = ViewOrigin;
             float ox = Mathf.Round(o.x / step) * step, oy = Mathf.Round(o.y / step) * step;
             var v = ViewSize;
