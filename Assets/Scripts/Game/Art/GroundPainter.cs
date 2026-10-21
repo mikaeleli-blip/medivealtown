@@ -3,7 +3,8 @@ using UnityEngine;
 
 namespace MedievalTown.Game.Art
 {
-    /// <summary>Paints grass, water with sandy banks, hill plateaus with cliffs, roads and bridges into one big canvas.</summary>
+    /// <summary>Paints grass, water with sandy banks, hill plateaus with cliffs, roads and bridges, a chunk of the map at a time
+    /// into that chunk's own canvas (the map is too big to hold painted all at once).</summary>
     public sealed class GroundPainter
     {
         const string SNOW = "#f2f6f8", SNOW2 = "#cfdde6";
@@ -24,7 +25,8 @@ namespace MedievalTown.Game.Art
         static readonly string[] Cliff = { "#8a6d4c", "#a3855f", "#74593e" };
         public static string GrassBase(int si) { return Grass[si][0]; }
 
-        public readonly PixelCanvas Canvas;
+        /// <summary>The chunk being painted, and where it sits on the map in pixels.</summary>
+        PixelCanvas Canvas; int ox, oy;
         readonly Town town;
         Noise.Value2D gn;
         int gnSeed = int.MinValue;
@@ -32,20 +34,24 @@ namespace MedievalTown.Game.Art
         public GroundPainter(Town town)
         {
             this.town = town;
-            Canvas = new PixelCanvas(Town.Cols * 16, Town.Rows * 16);
         }
+
+        void Target(PixelCanvas c, int tx0, int ty0) { Canvas = c; ox = tx0 * 16; oy = ty0 * 16; }
 
         bool Land(byte v) { return v != Tile.Water && v != Tile.OutOfBounds; }
 
-        public void PaintAll(int si)
+        /// <summary>Paints the tiles of a chunk (tw x th tiles from tx0, ty0) into its canvas.</summary>
+        public void PaintChunk(PixelCanvas c, int tx0, int ty0, int tw, int th, int si)
         {
-            for (int ty = 0; ty < Town.Rows; ty++) for (int tx = 0; tx < Town.Cols; tx++) PaintBase(tx, ty, si);
-            for (int ty = 0; ty < Town.Rows; ty++) for (int tx = 0; tx < Town.Cols; tx++) PaintOverlay(tx, ty, si);
+            Target(c, tx0, ty0);
+            for (int ty = ty0; ty < ty0 + th; ty++) for (int tx = tx0; tx < tx0 + tw; tx++) PaintBase(tx, ty, si);
+            for (int ty = ty0; ty < ty0 + th; ty++) for (int tx = tx0; tx < tx0 + tw; tx++) PaintOverlay(tx, ty, si);
         }
 
-        /// <summary>Repaints a tile and its neighbours (banks and road joins depend on neighbours).</summary>
-        public void PaintAround(int x, int y, int si)
+        /// <summary>Repaints a tile and its neighbours (banks and road joins depend on neighbours) in a chunk's canvas.</summary>
+        public void PaintAround(PixelCanvas c, int tx0, int ty0, int x, int y, int si)
         {
+            Target(c, tx0, ty0);
             for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) PaintBase(x + dx, y + dy, si);
             for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) PaintOverlay(x + dx, y + dy, si);
         }
@@ -127,14 +133,14 @@ namespace MedievalTown.Game.Art
                         if (n == Tile.Hill && (py < 2 || (py < 4 && (wx + wy) % 2 == 0))) c = si == 3 ? "#c3cfd7" : G[1];
                         if (s == Tile.Hill && py == 15) c = G[1];
                     }
-                    Canvas.D(wx, wy, c);
+                    Canvas.D(wx - ox, wy - oy, c);
                 }
         }
 
         void PaintOverlay(int tx, int ty, int si)
         {
             if (tx < 0 || ty < 0 || tx >= Town.Cols || ty >= Town.Rows) return;
-            var g = Canvas; int X = tx * 16, Y = ty * 16; byte t = town.TerrainAt(tx, ty);
+            var g = Canvas; int X = tx * 16 - ox, Y = ty * 16 - oy; byte t = town.TerrainAt(tx, ty);
             if (town.IsRoad(tx, ty)) { if (t == Tile.Water) Bridge(X, Y, tx, ty, si); else Road(X, Y, tx, ty, si); return; }
             if (t == Tile.Water && NextToFishery(tx, ty)) { Pier(X, Y, si); return; }
             if (t == Tile.Hill)

@@ -63,6 +63,7 @@ namespace MedievalTown.Simulation
         {
             rng = null; occDirty = true; MapVersion++;
             if (DirtyTiles == null) DirtyTiles = new List<int>();
+            if (DirtyWatchers == null) DirtyWatchers = new List<List<int>>();
             if (Policy == null) Policy = new ManorPolicy();
             if (Crown == null) Crown = new Crown();
             if (History == null) History = new List<HistoryPoint>();
@@ -219,7 +220,17 @@ namespace MedievalTown.Simulation
         // =====================================================================
         public byte TerrainAt(int x, int y) { return x < 0 || y < 0 || x >= Cols || y >= Rows ? Tile.OutOfBounds : Terrain[y * Cols + x]; }
         void SetTerrain(int x, int y, byte v) { if (TerrainAt(x, y) == Tile.OutOfBounds) return; Terrain[y * Cols + x] = v; MarkDirty(x, y); }
-        void MarkDirty(int x, int y) { DirtyTiles.Add(y * Cols + x); MapVersion++; }
+        void MarkDirty(int x, int y)
+        {
+            int k = y * Cols + x;
+            if (DirtyTiles.Count < 40000) DirtyTiles.Add(k); MapVersion++;
+            foreach (var w in DirtyWatchers) if (w.Count < 40000) w.Add(k);
+        }
+        /// <summary>Lists the renderer and pathfinder read to learn which tiles changed (each empties its own). One that fills up
+        /// has missed too much and should rebuild everything.</summary>
+        [NonSerialized] public List<List<int>> DirtyWatchers = new List<List<int>>();
+        public List<int> WatchTiles() { if (DirtyWatchers == null) DirtyWatchers = new List<List<int>>(); var l = new List<int>(); DirtyWatchers.Add(l); return l; }
+        public void UnwatchTiles(List<int> l) { if (DirtyWatchers != null) DirtyWatchers.Remove(l); }
         void MarkDirty(Building b) { var d = b.Def; for (int dx = 0; dx < d.W; dx++) for (int dy = 0; dy < d.H; dy++) MarkDirty(b.X + dx, b.Y + dy); occDirty = true; }
         public static bool IsTreeish(byte t) { return t == Tile.Tree || t == Tile.Sapling; }
 
@@ -483,7 +494,7 @@ namespace MedievalTown.Simulation
                     if (t.TerrainAt(x, y) != Tile.OutOfBounds) t.Terrain[y * Cols + x] = Tile.Grass;
             // the old track through it
             string err;
-            for (int x = 0; x < Cols; x++)
+            for (int x = Math.Max(0, WagonX - 112); x < Math.Min(Cols, WagonX + 112); x++)   // the old road runs a fair way either side of the village
             {
                 if (t.TerrainAt(x, TrailRow) == Tile.Hill) t.Terrain[TrailRow * Cols + x] = Tile.Grass;
                 if (t.TerrainAt(x, TrailRow) == Tile.Tree || t.TerrainAt(x, TrailRow) == Tile.Rock) t.Terrain[TrailRow * Cols + x] = Tile.Grass;

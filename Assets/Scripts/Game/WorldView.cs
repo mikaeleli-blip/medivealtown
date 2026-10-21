@@ -30,10 +30,12 @@ namespace MedievalTown.Game
         Nav nav;
         GroundPainter painter;
         const int ChunkTiles = 32;
-        sealed class GroundChunk { public Texture2D Tex; public SpriteRenderer Sr; public int X0, Y0, W, H; public Color32[] Buf; }
-        readonly List<GroundChunk> chunks = new List<GroundChunk>();
-        int chunkCols;
-        int paintedSeason = -1, seenMapVersion = -1;
+        // The ground is painted a chunk at a time, only near the camera: the map is far too big to keep painted whole.
+        sealed class GroundChunk { public Texture2D Tex; public SpriteRenderer Sr; public int Tx0, Ty0, Tw, Th; public PixelCanvas Canvas; public int Season = -1; public int Seen; public bool Dirty; }
+        readonly Dictionary<int, GroundChunk> chunks = new Dictionary<int, GroundChunk>();
+        int chunkCols, chunkRows, frameNo;
+        const int MaxChunks = 64;
+        List<int> groundWatch, treeWatch;
         float time;
 
         sealed class BuildingView
@@ -99,23 +101,15 @@ namespace MedievalTown.Game
             foreach (Transform c in transform) Destroy(c.gameObject);
             buildings.Clear(); trees.Clear(); treeKinds.Clear(); people.Clear(); particles.Clear(); particlePool.Clear(); smokeTimers.Clear();
             sparkles.Clear(); clouds.Clear(); birds.Clear(); tents.Clear(); tentSpot.Clear();
-            paintedSeason = -1; seenMapVersion = -1; treeSeason = -1; treeMapVersion = -1;
+            treeSeason = -1; treeMapVersion = -1;
+            if (town != null) { if (groundWatch != null) town.UnwatchTiles(groundWatch); if (treeWatch != null) town.UnwatchTiles(treeWatch); }
 
             layerBuildings = Layer("Buildings"); layerTrees = Layer("Trees"); layerPeople = Layer("Folk"); layerFx = Layer("Effects");
             painter = new GroundPainter(town);
+            foreach (var c in chunks.Values) if (c.Tex != null) Destroy(c.Tex);
             chunks.Clear();
-            int cpx = ChunkTiles * 16; chunkCols = (painter.Canvas.W + cpx - 1) / cpx;
-            for (int y0 = 0; y0 < painter.Canvas.H; y0 += cpx)
-                for (int x0 = 0; x0 < painter.Canvas.W; x0 += cpx)
-                {
-                    var c = new GroundChunk { X0 = x0, Y0 = y0, W = Mathf.Min(cpx, painter.Canvas.W - x0), H = Mathf.Min(cpx, painter.Canvas.H - y0) };
-                    c.Tex = new Texture2D(c.W, c.H, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Ground" };
-                    c.Buf = new Color32[c.W * c.H];
-                    var gs = Sprite.Create(c.Tex, new Rect(0, 0, c.W, c.H), new Vector2(0, 1), Pixels.PerUnit, 0, SpriteMeshType.FullRect);
-                    c.Sr = MakeSr("Ground", transform, gs, OrderGround);
-                    c.Sr.transform.position = Pixels.ToWorld(x0, y0);
-                    chunks.Add(c);
-                }
+            chunkCols = (Town.Cols + ChunkTiles - 1) / ChunkTiles; chunkRows = (Town.Rows + ChunkTiles - 1) / ChunkTiles;
+            groundWatch = town.WatchTiles(); treeWatch = town.WatchTiles();
 
             night = MakeSr("Night", layerFx, NatureArt.White, OrderNight);
             sunset = MakeSr("Sunset", layerFx, NatureArt.White, OrderNight - 1);
@@ -126,7 +120,7 @@ namespace MedievalTown.Game
             ghostFoot = MakeSr("GhostFoot", layerFx, NatureArt.White, OrderGhost + 2);
             campfire = MakeSr("Campfire", layerBuildings, PropArt.Campfire(0), 0); campfire.enabled = false;
             for (int i = 0; i < 160; i++) { var s = MakeSr("Sparkle", layerFx, NatureArt.White, OrderBase + 1); s.color = new Color32(214, 238, 250, 255); s.enabled = false; sparkles.Add(s); }
-            for (int i = 0; i < Mathf.Max(5, Town.Cols * Town.Rows / 560); i++)
+            for (int i = 0; i < Mathf.Clamp(Town.Cols * Town.Rows / 560, 5, 70); i++)
             {
                 int rx = Random.Range(40, 90), ry = Random.Range(18, 34);
                 clouds.Add(new Cloud { Sr = MakeSr("Cloud", layerFx, CloudSprite(rx, ry), OrderClouds), X = Random.Range(0f, Town.Cols * 16f), Y = Random.Range(0f, Town.Rows * 16f), Rx = rx });
@@ -183,43 +177,79 @@ namespace MedievalTown.Game
             UpdateZones();
         }
 
+        /// <summary>Tiles in view, with a margin, as a rect of tile coordinates.</summary>
+        RectInt ViewTiles(int margin)
+        {
+            var o = rig.ViewOrigin; var v = rig.ViewSize;
+            int x0 = Mathf.Max(0, Mathf.FloorToInt(o.x / 16) - margin), y0 = Mathf.Max(0, Mathf.FloorToInt(o.y / 16) - margin);
+            int x1 = Mathf.Min(Town.Cols - 1, Mathf.CeilToInt((o.x + v.x) / 16) + margin), y1 = Mathf.Min(Town.Rows - 1, Mathf.CeilToInt((o.y + v.y) / 16) + margin);
+            return new RectInt(x0, y0, Mathf.Max(0, x1 - x0 + 1), Mathf.Max(0, y1 - y0 + 1));
+        }
+
         void SyncGround(int si)
         {
-            if (paintedSeason != si)
+            frameNo++;
+            // tiles that changed: repaint them in the chunks that are loaded (the rest are painted fresh when they come into view)
+            if (groundWatch.Count >= 40000) { foreach (var c in chunks.Values) c.Season = -1; groundWatch.Clear(); }
+            if (groundWatch.Count > 0)
             {
-                painter.PaintAll(si);
-                foreach (var c in chunks) Upload(c);
-                paintedSeason = si; seenMapVersion = town.MapVersion; town.DirtyTiles.Clear();
-                return;
-            }
-            if (seenMapVersion != town.MapVersion)
-            {
-                var done = new HashSet<int>(); var dirty = new HashSet<int>();
-                foreach (int k in town.DirtyTiles)
+                var done = new HashSet<int>();
+                foreach (int k in groundWatch)
                 {
                     if (!done.Add(k)) continue;
                     int tx = k % Town.Cols, ty = k / Town.Cols;
-                    painter.PaintAround(tx, ty, si);
-                    for (int dy = -1; dy <= 1; dy++)
-                        for (int dx = -1; dx <= 1; dx++)
+                    for (int cy = (ty - 1) / ChunkTiles; cy <= (ty + 1) / ChunkTiles; cy++)
+                        for (int cx = (tx - 1) / ChunkTiles; cx <= (tx + 1) / ChunkTiles; cx++)
                         {
-                            int x = tx + dx, y = ty + dy;
-                            if (x < 0 || y < 0 || x >= Town.Cols || y >= Town.Rows) continue;
-                            dirty.Add((y / ChunkTiles) * chunkCols + x / ChunkTiles);
+                            GroundChunk c;
+                            if (cx < 0 || cy < 0 || !chunks.TryGetValue(cy * chunkCols + cx, out c) || c.Season != si) continue;
+                            painter.PaintAround(c.Canvas, c.Tx0, c.Ty0, tx, ty, si); c.Dirty = true;
                         }
                 }
-                town.DirtyTiles.Clear();
-                foreach (int i in dirty) if (i >= 0 && i < chunks.Count) Upload(chunks[i]);
-                seenMapVersion = town.MapVersion;
+                groundWatch.Clear();
+                foreach (var c in chunks.Values) if (c.Dirty) { Upload(c); c.Dirty = false; }
+            }
+            // the chunks in view: a new one is painted at once; one from another season is repainted a few a frame
+            var vt = ViewTiles(4);
+            int budget = 3;
+            for (int cy = vt.yMin / ChunkTiles; cy <= (vt.yMax - 1) / ChunkTiles; cy++)
+                for (int cx = vt.xMin / ChunkTiles; cx <= (vt.xMax - 1) / ChunkTiles; cx++)
+                {
+                    int key = cy * chunkCols + cx;
+                    GroundChunk c;
+                    if (!chunks.TryGetValue(key, out c)) { c = NewChunk(cx, cy); chunks[key] = c; }
+                    c.Seen = frameNo;
+                    if (c.Season == si) continue;
+                    if (c.Season >= 0 && budget-- <= 0) continue;
+                    painter.PaintChunk(c.Canvas, c.Tx0, c.Ty0, c.Tw, c.Th, si);
+                    c.Season = si; Upload(c); c.Sr.enabled = true;
+                }
+            // forget the chunks longest out of view
+            if (chunks.Count > MaxChunks)
+            {
+                foreach (var kv in chunks.OrderBy(kv => kv.Value.Seen).Take(chunks.Count - MaxChunks).ToList())
+                {
+                    if (kv.Value.Seen == frameNo) break;
+                    Destroy(kv.Value.Sr.gameObject); Destroy(kv.Value.Tex); chunks.Remove(kv.Key);
+                }
             }
         }
 
-        void Upload(GroundChunk c)
+        GroundChunk NewChunk(int cx, int cy)
         {
-            var px = painter.Canvas.Px; int W = painter.Canvas.W, H = painter.Canvas.H;
-            for (int j = 0; j < c.H; j++) System.Array.Copy(px, (H - c.Y0 - c.H + j) * W + c.X0, c.Buf, j * c.W, c.W);
-            c.Tex.SetPixels32(c.Buf); c.Tex.Apply(false);
+            var c = new GroundChunk { Tx0 = cx * ChunkTiles, Ty0 = cy * ChunkTiles };
+            c.Tw = Mathf.Min(ChunkTiles, Town.Cols - c.Tx0); c.Th = Mathf.Min(ChunkTiles, Town.Rows - c.Ty0);
+            int w = c.Tw * 16, h = c.Th * 16;
+            c.Canvas = new PixelCanvas(w, h);
+            c.Tex = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp, name = "Ground" };
+            var gs = Sprite.Create(c.Tex, new Rect(0, 0, w, h), new Vector2(0, 1), Pixels.PerUnit, 0, SpriteMeshType.FullRect);
+            c.Sr = MakeSr("Ground", transform, gs, OrderGround);
+            c.Sr.transform.position = Pixels.ToWorld(c.Tx0 * 16, c.Ty0 * 16);
+            c.Sr.enabled = false;
+            return c;
         }
+
+        void Upload(GroundChunk c) { c.Tex.SetPixels32(c.Canvas.Px); c.Tex.Apply(false); }
 
         // ---------------------------------------------------------------- buildings
         public BuildingSprites ArtFor(Building b) { return BuildingArt.Get(b.Type, BuildingArt.VariantOf(b), town.Season); }
@@ -422,40 +452,60 @@ namespace MedievalTown.Game
         // ---------------------------------------------------------------- trees
         static bool IsGrowth(byte t) { return t == Tile.Tree || t == Tile.Rock || t == Tile.Sapling || t == Tile.Stump; }
 
+        RectInt treeRect;
+        /// <summary>Trees, saplings, stumps and boulders are sprites only near the camera.</summary>
         void SyncTrees(int si)
         {
-            if (treeSeason == si && treeMapVersion == town.MapVersion) return;
+            var vt = ViewTiles(6);
+            bool moved = !treeRect.Contains(new Vector2Int(vt.xMin, vt.yMin)) || !treeRect.Contains(new Vector2Int(vt.xMax - 1, vt.yMax - 1));
             bool reseason = treeSeason != si;
-            treeSeason = si; treeMapVersion = town.MapVersion;
-            var want = new HashSet<int>();
-            for (int ty = 0; ty < Town.Rows; ty++)
-                for (int tx = 0; tx < Town.Cols; tx++)
-                {
-                    byte t = town.TerrainAt(tx, ty);
-                    if (!IsGrowth(t)) continue;
-                    int k = ty * Town.Cols + tx; want.Add(k);
-                    SpriteRenderer sr; byte was;
-                    bool exists = trees.TryGetValue(k, out sr);
-                    if (exists && !reseason && treeKinds.TryGetValue(k, out was) && was == t) continue;
-                    var pl = NatureArt.At(tx, ty, t, si);
-                    if (exists && treeKinds.TryGetValue(k, out was) && was == Tile.Tree && t == Tile.Stump && !reseason) Felled(tx, ty, si);
-                    if (!exists) { sr = MakeSr("Growth", layerTrees, pl.Sprite, 0); trees[k] = sr; }
-                    sr.sprite = pl.Sprite;
-                    sr.transform.position = Pixels.ToWorld(pl.Px, pl.Py);
-                    sr.sortingOrder = SortOrder(pl.Py);
-                    treeKinds[k] = t;
-                }
-            if (want.Count != trees.Count)
+            if (!reseason && !moved && treeWatch.Count == 0) return;
+            if (moved || reseason || treeWatch.Count >= 40000)
             {
+                // a fresh window, a little bigger than the view so small pans don't rebuild it
+                treeRect = ViewTiles(18);
+                treeWatch.Clear();
+                var want = new HashSet<int>();
+                for (int ty = treeRect.yMin; ty < treeRect.yMax; ty++)
+                    for (int tx = treeRect.xMin; tx < treeRect.xMax; tx++)
+                        if (IsGrowth(town.TerrainAt(tx, ty))) { int k = ty * Town.Cols + tx; want.Add(k); TreeAt(tx, ty, si, reseason, false); }
                 var gone = new List<int>();
                 foreach (var kv in trees) if (!want.Contains(kv.Key)) gone.Add(kv.Key);
-                foreach (int k in gone)
-                {
-                    byte was;
-                    if (treeKinds.TryGetValue(k, out was) && was == Tile.Rock) Broken(k % Town.Cols, k / Town.Cols);
-                    Destroy(trees[k].gameObject); trees.Remove(k); treeKinds.Remove(k);
-                }
+                foreach (int k in gone) { Destroy(trees[k].gameObject); trees.Remove(k); treeKinds.Remove(k); }
             }
+            else
+            {
+                foreach (int k in treeWatch)
+                {
+                    int tx = k % Town.Cols, ty = k / Town.Cols;
+                    if (!treeRect.Contains(new Vector2Int(tx, ty))) continue;
+                    if (IsGrowth(town.TerrainAt(tx, ty))) TreeAt(tx, ty, si, false, true);
+                    else if (trees.ContainsKey(k))
+                    {
+                        byte was;
+                        if (treeKinds.TryGetValue(k, out was) && was == Tile.Rock) Broken(tx, ty);
+                        Destroy(trees[k].gameObject); trees.Remove(k); treeKinds.Remove(k);
+                    }
+                }
+                treeWatch.Clear();
+            }
+            treeSeason = si; treeMapVersion = town.MapVersion;
+        }
+
+        void TreeAt(int tx, int ty, int si, bool reseason, bool live)
+        {
+            byte t = town.TerrainAt(tx, ty);
+            int k = ty * Town.Cols + tx;
+            SpriteRenderer sr; byte was;
+            bool exists = trees.TryGetValue(k, out sr);
+            if (exists && !reseason && treeKinds.TryGetValue(k, out was) && was == t) return;
+            var pl = NatureArt.At(tx, ty, t, si);
+            if (live && exists && treeKinds.TryGetValue(k, out was) && was == Tile.Tree && t == Tile.Stump) Felled(tx, ty, si);
+            if (!exists) { sr = MakeSr("Growth", layerTrees, pl.Sprite, 0); trees[k] = sr; }
+            sr.sprite = pl.Sprite;
+            sr.transform.position = Pixels.ToWorld(pl.Px, pl.Py);
+            sr.sortingOrder = SortOrder(pl.Py);
+            treeKinds[k] = t;
         }
 
         void Felled(int tx, int ty, int si)

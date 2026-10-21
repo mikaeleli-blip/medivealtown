@@ -13,13 +13,25 @@ namespace MedievalTown.Game
         int version = -1;
         const int C = Town.Cols, R = Town.Rows;
 
-        public Nav(Town t) { town = t; }
+        List<int> watch;
+        public Nav(Town t) { town = t; watch = t.WatchTiles(); }
 
+        /// <summary>Brings the cost grid up to date: the whole of it the first time (or after too many changes to track),
+        /// otherwise just the tiles that changed.</summary>
         void Rebuild()
         {
-            if (cost == null) cost = new float[C * R];
-            for (int y = 0; y < R; y++)
-                for (int x = 0; x < C; x++)
+            if (cost == null || watch.Count >= 40000)
+            {
+                if (cost == null) cost = new float[C * R];
+                for (int y = 0; y < R; y++) for (int x = 0; x < C; x++) CostCell(x, y);
+            }
+            else foreach (int k in watch) CostCell(k % C, k / C);
+            watch.Clear();
+            version = town.MapVersion;
+        }
+
+        void CostCell(int x, int y)
+        {
                 {
                     int i = y * C + x;
                     byte t = town.TerrainAt(x, y);
@@ -35,7 +47,6 @@ namespace MedievalTown.Game
                     else c = 2f;
                     cost[i] = c;
                 }
-            version = town.MapVersion;
         }
 
         bool AdjacentFishery(int x, int y)

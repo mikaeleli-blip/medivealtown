@@ -70,6 +70,31 @@ namespace MedievalTown.Simulation
             double roll = r.NextDouble();
             if (roll < 0.85) River(cx + side * (58 + r.Next(-4, 5)), 6.0, 3, r.NextDouble() * 6.28, 0);
             if (roll >= 0.5 && roll < 0.95) River(cx - side * (66 + r.Next(-4, 5)), 4.5, 2, r.NextDouble() * 6.28, 7);
+            // the wider country: more rivers well beyond, running north to south, and some east to west
+            Action<double, double, int, double, int> RiverAcross = (baseY, amp, width, phase, salt) =>
+            {
+                for (int x = 0; x < cols; x++)
+                {
+                    double y = baseY + amp * Math.Sin(x / 11.0 + phase) + amp * 0.4 * Math.Sin(x / 4.3 + phase * 2) + amp * 0.5 * Math.Sin(x / 23.0 + phase * 3);
+                    int w = width + (n1.Sample(x / 5f, 3.3f + salt) > 0.58f ? 1 : 0);
+                    int y0 = (int)Math.Round(y - w / 2.0);
+                    for (int yy = y0; yy < y0 + w; yy++) if (inb(x, yy)) T[I(x, yy)] = Tile.Water;
+                }
+            };
+            // one on each side, well apart from each other and from the home rivers
+            Func<int, int, int, int> Spot = (centre, near, span) =>
+            {
+                int side0 = r.Next(2) == 0 ? -1 : 1;
+                return centre + side0 * (near + r.Next(0, Math.Max(1, span)));
+            };
+            if (cols > 400)
+            {
+                int span = cols / 2 - 150;
+                River(cx - 130 - r.Next(0, Math.Max(1, span)), 5 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 11);
+                River(cx + 140 + r.Next(0, Math.Max(1, span)), 5 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 12);
+            }
+            if (rows > 300 && r.NextDouble() < 0.7)
+                RiverAcross(Spot(cy, 100, rows / 2 - 115), 4 + r.NextDouble() * 3, 2 + r.Next(2), r.NextDouble() * 6.28, 31);
 
             // Lakes: one handy to the south-east of town, others further out
             Action<int, int, double, double> Lake = (lx, ly, rx, ry) =>
@@ -86,6 +111,14 @@ namespace MedievalTown.Simulation
             Lake(cx - 45 + r.Next(-5, 6), cy - 32 + r.Next(-4, 5), 9, 5);
             Lake(cx + 20 + r.Next(-6, 7), cy - 38 + r.Next(-3, 4), 7, 4);
             Lake(cx - 12 + r.Next(-6, 7), cy + 40 + r.Next(-3, 4), 8, 4.5);
+            // and lakes scattered over the wider country
+            int lakes = cols * rows / 9000;
+            for (int i = 0; i < lakes; i++)
+            {
+                int lx = r.Next(8, cols - 8), ly = r.Next(8, rows - 8);
+                if (Math.Abs(lx - cx) < 60 && Math.Abs(ly - cy) < 45) continue;   // the home country already has its lakes
+                Lake(lx, ly, 4 + r.NextDouble() * 8, 2.5 + r.NextDouble() * 4);
+            }
 
             Func<int, int, double> dist = (x, y) => Math.Sqrt(Math.Pow((x - cx) / 1.35, 2) + Math.Pow(y - cy, 2));
             // Hills

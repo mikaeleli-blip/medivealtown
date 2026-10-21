@@ -338,10 +338,13 @@ namespace MedievalTown.Game
         }
 
         // ---------------------------------------------------------------- minimap
+        Town miniTown; List<int> miniWatch;
         void RebuildMinimap()
         {
             int w = Town.Cols, h = Town.Rows, si = T.Season;
             if (minimap == null) minimap = new Texture2D(w, h, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, hideFlags = HideFlags.HideAndDontSave };
+            bool full = miniBase == null || miniTown != T || miniSeason != si || miniWatch == null || miniWatch.Count >= 40000;
+            if (miniTown != T) { if (miniTown != null && miniWatch != null) miniTown.UnwatchTiles(miniWatch); miniTown = T; miniWatch = T.WatchTiles(); }
             if (miniBase == null) miniBase = new Color32[w * h];
             var tileCol = new Color32[7];
             tileCol[0] = PixelCanvas.C(GroundPainter.GrassBase(si));
@@ -350,14 +353,15 @@ namespace MedievalTown.Game
             tileCol[3] = PixelCanvas.C("#a39c90");
             tileCol[4] = PixelCanvas.C(si == 3 ? "#d8e2e8" : GroundPainter.HillColors[si][0]);
             tileCol[5] = tileCol[0]; tileCol[6] = tileCol[0];
-            for (int ty = 0; ty < Town.Rows; ty++)
-                for (int tx = 0; tx < Town.Cols; tx++)
-                {
-                    var b = T.OccupantAt(tx, ty);
-                    byte t = T.TerrainAt(tx, ty);
-                    var c = b != null ? PixelCanvas.C(b.Type == BuildingType.Road ? "#c49c69" : b.Def.Color) : tileCol[Mathf.Min(6, (int)t)];
-                    miniBase[(h - 1 - ty) * w + tx] = c;
-                }
+            System.Action<int, int> cell = (tx, ty) =>
+            {
+                var b = T.OccupantAt(tx, ty);
+                byte t = T.TerrainAt(tx, ty);
+                miniBase[(h - 1 - ty) * w + tx] = b != null ? PixelCanvas.C(b.Type == BuildingType.Road ? "#c49c69" : b.Def.Color) : tileCol[Mathf.Min(6, (int)t)];
+            };
+            if (full) { for (int ty = 0; ty < Town.Rows; ty++) for (int tx = 0; tx < Town.Cols; tx++) cell(tx, ty); }
+            else foreach (int k in miniWatch) cell(k % Town.Cols, k / Town.Cols);
+            miniWatch.Clear();
             miniVersion = T.MapVersion; miniSeason = si;
         }
 

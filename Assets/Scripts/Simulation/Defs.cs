@@ -55,7 +55,7 @@ namespace MedievalTown.Simulation
     /// <summary>All tunable numbers live here so balancing happens in one place.</summary>
     public static class Balance
     {
-        public const int Cols = 224, Rows = 160;   // 16 px tiles
+        public const int Cols = 704, Rows = 504;   // 16 px tiles (about ten times the old 224 x 160 map)
         public const int GoodCount = 12;
         public static readonly int[] SeasonDays = { 14, 21, 21, 14 };
         public const int DaysPerYear = 70, StartYear = 1240;
