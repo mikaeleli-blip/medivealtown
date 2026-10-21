@@ -64,9 +64,12 @@ namespace MedievalTown.Simulation
                     for (int xx = x0; xx < x0 + w; xx++) if (inb(xx, y)) T[I(xx, y)] = Tile.Water;
                 }
             };
-            // far enough out that the town has a wide plain to grow into before it has to cross water
-            River(cx - 58 + r.Next(-4, 5), 6.0, 3, r.NextDouble() * 6.28, 0);
-            River(cx + 66 + r.Next(-4, 5), 4.5, 2, r.NextDouble() * 6.28, 7);
+            // far enough out that the town has a wide plain to grow into before it has to cross water. Maps differ:
+            // a river on one side (most often), a river and a creek, just a creek, or no running water but the lakes
+            int side = r.Next(2) == 0 ? -1 : 1;
+            double roll = r.NextDouble();
+            if (roll < 0.85) River(cx + side * (58 + r.Next(-4, 5)), 6.0, 3, r.NextDouble() * 6.28, 0);
+            if (roll >= 0.5 && roll < 0.95) River(cx - side * (66 + r.Next(-4, 5)), 4.5, 2, r.NextDouble() * 6.28, 7);
 
             // Lakes: one handy to the south-east of town, others further out
             Action<int, int, double, double> Lake = (lx, ly, rx, ry) =>
