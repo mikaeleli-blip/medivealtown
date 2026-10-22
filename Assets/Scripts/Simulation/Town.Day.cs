@@ -114,10 +114,11 @@ namespace MedievalTown.Simulation
                     var hearth = HomeOf(p);
                     bool cold = Season >= 2 && hearth != null && hearth.Stock[(int)Good.Firewood] < 12;
                     if (w != null && w.Built && !cold && TradeNeeded(w)) { p.Chore = Chore.Trade; p.TaskId = w.Id; continue; }
-                    // freemen without a trade hire on to the crown's building work for a wage, if he can pay
-                    if (Coin >= Policy.FreeWage) { var s = nextSite(); if (s != null) { p.Chore = Chore.Build; p.TaskId = s.Id; continue; } }
-                    // or hire out as a day labourer: reaping for a family that can't get its harvest in, or on the lord's demesne
+                    // freemen without a trade hire out as day labourers: at harvest reaping comes first, for a family that can't get
+                    // its crop in or on the lord's demesne; otherwise the crown's building work for a wage, if he can pay
                     if (fieldHands == null) fieldHands = FieldHands();
+                    if (Season == 2) { var rf = HireField(p, fieldHands); if (rf != null) { p.Chore = Chore.Labour; p.TaskId = rf.Id; continue; } }
+                    if (Coin >= Policy.FreeWage) { var s = nextSite(); if (s != null) { p.Chore = Chore.Build; p.TaskId = s.Id; continue; } }
                     var lf = HireField(p, fieldHands);
                     if (lf != null) { p.Chore = Chore.Labour; p.TaskId = lf.Id; continue; }
                     var home = HomeOf(p);
@@ -127,6 +128,9 @@ namespace MedievalTown.Simulation
 
                 // the reeve's collecting day
                 if (p.Rank == Rank.Reeve && WeekdayIndex == 4) { var vc = CrossOf(VillageOf(p)); p.Chore = Chore.Collect; p.TaskId = vc != null ? vc.Id : -1; continue; }
+                // at harvest a family reaps its own strip first: the lord doesn't call week-work while the crop stands
+                var own = StripOf(p);
+                if (Season == 2 && own != null && FieldNeedsWork(own)) { p.Chore = Chore.OwnStrip; p.TaskId = own.Id; continue; }
                 // serfs and the reeve
                 if (IsWeekWorkDay || p.Rank == Rank.Reeve)
                 {

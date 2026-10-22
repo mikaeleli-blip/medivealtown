@@ -156,15 +156,16 @@ namespace MedievalTown.Simulation
                 if (free == null) break;
                 give(free, id); without.Remove(id);
             }
-            // strips still going spare go to big families as a second strip, in their own village
+            // strips still going spare go to families with the hands to reap two (four grown workers or more), in their own village
             foreach (var st in strips.Where(x => x.HolderId < 0).ToList())
             {
-                int pick = -1, bestSize = 4;
+                int pick = -1, bestHands = 3;
                 foreach (var id in heads)
                 {
                     if (held(id) != 1) continue;
                     var home = HomeOf(GetCitizen(id)); if (home == null || home.VillageId != st.VillageId) continue;
-                    if (home.Residents.Count > bestSize) { bestSize = home.Residents.Count; pick = id; }
+                    int hands = home.Residents.Count(r => { var c = GetCitizen(r); return c != null && !c.IsChild && c.Age < 58 && c.Rank == Rank.Serf; });
+                    if (hands > bestHands) { bestHands = hands; pick = id; }
                 }
                 if (pick >= 0) give(st, pick);
             }
