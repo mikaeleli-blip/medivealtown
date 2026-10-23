@@ -305,7 +305,7 @@ namespace MedievalTown.Game
             {
                 case BuildingType.Woodcutter: return Good.Timber;
                 case BuildingType.Quarry: return Good.Stone;
-                case BuildingType.Strip: case BuildingType.Demesne: return Good.Grain;
+                case BuildingType.Strip: case BuildingType.OpenField: case BuildingType.Demesne: return Good.Grain;
             }
             return null;
         }
@@ -317,7 +317,7 @@ namespace MedievalTown.Game
                 case BuildingType.Granary: return b.Stock[(int)g] / 120f;
                 case BuildingType.Woodcutter: return town.StoreStock(Good.Timber) / 100f;
                 case BuildingType.Quarry: return town.StoreStock(Good.Stone) / 100f;
-                case BuildingType.Strip: case BuildingType.Demesne:
+                case BuildingType.Strip: case BuildingType.OpenField: case BuildingType.Demesne:
                     return town.Season == 2 && b.Harvested > 0 && b.CropLeft > 0.5f ? 0.6f : 0f;   // sheaves waiting to be carted
             }
             return 0;
@@ -376,7 +376,7 @@ namespace MedievalTown.Game
                     {
                         int st = PropArt.FieldStage(b, si);
                         float tot = b.CropLeft + b.Harvested;
-                        v.Overlay.sprite = PropArt.FieldCrops(st, frame, tot > 0 ? b.Harvested / tot : 0, d.W * 16, d.H * 16, b.Type == BuildingType.Strip);
+                        v.Overlay.sprite = PropArt.FieldCrops(st, frame, tot > 0 ? b.Harvested / tot : 0, d.W * 16, d.H * 16, b.Type == BuildingType.Strip || b.Type == BuildingType.OpenField, b.Type == BuildingType.OpenField ? 32 : 15);
                     }
                 }
                 if (v.Pile != null)

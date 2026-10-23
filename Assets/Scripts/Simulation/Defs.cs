@@ -7,7 +7,7 @@ namespace MedievalTown.Simulation
     public enum BuildingType
     {
         Road, Cottage, FreeHouse, Keep, Church, Granary, Strip, Demesne, Woodcutter, Quarry, Mill, Alehouse, Pavilion, Cart, StewardHall, Wall, WallTower, Gatehouse, VillageCross, Manor, BoundaryStone,
-        Pasture, Sheepfold, Fishpond, Bakehouse, Butcher, Weaver, VillageBarn, MerchantHouse
+        Pasture, Sheepfold, Fishpond, Bakehouse, Butcher, Weaver, VillageBarn, MerchantHouse, OpenField
     }
     public enum Category { Roads, Homes, Fields, Works, Trades, Church, Crown, Realm, Hidden }
 
@@ -41,6 +41,7 @@ namespace MedievalTown.Simulation
         public float Work;               // labour-days to finish
         public bool Unique, IsStorage, IsHome, IsField, IsWall;
         public int Workers, Beds, Radius;
+        public int Shares;               // an open field: how many families' shares of strips it holds
         public bool NeedsStone, NeedsWater;
         // a trade a freeman family runs for itself: it makes Sells (from Buys, if any) and keeps the takings, less the market toll
         public bool IsShop;
@@ -166,7 +167,8 @@ namespace MedievalTown.Simulation
             Add(new BuildingDef { Type = BuildingType.Keep, Category = Category.Crown, Name = "Castle", Blurb = "The king's stone keep and great hall. Court is held here, and the taxes end up in its treasury. Until it stands the royal family lives in a pavilion.", W = 7, H = 6, Timber = 40, Stone = 100, Work = 60, Unique = true, IsHome = true, Beds = 12, Color = "#8d877d" });
             Add(new BuildingDef { Type = BuildingType.Church, Category = Category.Church, Name = "Parish Church", Blurb = "Stone nave and bell tower. The priest says mass on Sundays and takes a tenth of every harvest.", W = 3, H = 4, Timber = 20, Stone = 50, Work = 30, Unique = true, Beds = 1, Color = "#e8e2d4" });
             Add(new BuildingDef { Type = BuildingType.Granary, Category = Category.Crown, Name = "Royal Granary", Blurb = "The king's barn and stores: grain, flour, firewood, timber and stone. The grain taxes end up here.", W = 3, H = 2, Timber = 24, Stone = 6, Work = 10, IsStorage = true, Color = "#b5432f" });
-            Add(new BuildingDef { Type = BuildingType.Strip, Category = Category.Fields, Name = "Strip Field", Blurb = "A serf family's strips in the open field. They work it on the days they don't owe the king, and give part of the harvest in tax.", W = 5, H = 4, Work = 3, IsField = true, Color = "#a08452" });
+            Add(new BuildingDef { Type = BuildingType.OpenField, Category = Category.Fields, Name = "Open Field", Blurb = "One of the village's great open fields, ploughed in long strips: shares for eight serf families. They sow, tend and reap it together on the days they don't owe the king, each family takes the crop of its own strips and gives part of it in tax. A family with four grown workers can hold two shares.", W = 16, H = 8, Work = 16, IsField = true, Shares = 8, Color = "#a08452" });
+            Add(new BuildingDef { Type = BuildingType.Strip, Category = Category.Hidden, Name = "Strip Field", Blurb = "A serf family's strips in the open field. They work it on the days they don't owe the king, and give part of the harvest in tax.", W = 5, H = 4, Work = 3, IsField = true, Color = "#a08452" });
             Add(new BuildingDef { Type = BuildingType.Demesne, Category = Category.Hidden, Name = "Royal Demesne", Blurb = "No longer used.", W = 4, H = 4, Work = 3, IsField = true, Color = "#d8b060" });
             Add(new BuildingDef { Type = BuildingType.Woodcutter, Category = Category.Works, Name = "Woodward's Lodge", Blurb = "Freemen fell the king's trees for timber and split them for firewood.", W = 2, H = 2, Timber = 8, Work = 5, Workers = 2, Radius = 10, WorkerRank = Rank.Freeman, Color = "#7a4e2c" });
             Add(new BuildingDef { Type = BuildingType.Quarry, Category = Category.Works, Name = "Quarry", Blurb = "Freemen break stone from a hillside or boulders nearby.", W = 2, H = 2, Timber = 6, Work = 5, Workers = 2, Radius = 6, NeedsStone = true, WorkerRank = Rank.Freeman, Color = "#a39c90" });

@@ -247,7 +247,7 @@ namespace MedievalTown.Simulation
         {
             foreach (var f in Buildings.Where(b => b.Def.IsField && b.Built))
             {
-                f.CropLeft = f.CropGrowth * (f.Type == BuildingType.Demesne ? Balance.DemesneYield : Balance.StripYield);
+                f.CropLeft = f.CropGrowth * FieldYield(f);
                 f.Harvested = 0;
             }
         }
@@ -259,14 +259,14 @@ namespace MedievalTown.Simulation
             if (lost > 20) AddLog(Math.Round(lost) + " measures of grain were never brought in and rotted in the fields.", LogKind.Bad);
         }
 
-        /// <summary>Spring and summer: the crop grows with the hours put into it. Autumn: it's reaped. Every harvest gives the church its tithe.</summary>
-        float FieldWork(Building f, float hands, float bonus, Building pantry)
+        /// <summary>Spring and summer: the crop grows with the hours put into it. Autumn: it's reaped. Every harvest gives the church its tithe.
+        /// An open field's crop goes to the families holding shares in it, each its own strips' worth. A hired reaper keeps his cut.</summary>
+        float FieldWork(Building f, float hands, float bonus, Building pantry, Building reaper = null)
         {
             int si = Season;
-            bool lords = f.Type == BuildingType.Demesne;
             if (si <= 1)
             {
-                f.CropGrowth = Math.Min(1f, f.CropGrowth + (lords ? Balance.DemesneGrowth : Balance.StripGrowth) * hands * bonus);
+                f.CropGrowth = Math.Min(1f, f.CropGrowth + FieldGrowth(f) * hands * bonus);
                 return 0;
             }
             if (si != 2) return 0;
@@ -275,12 +275,25 @@ namespace MedievalTown.Simulation
             f.CropLeft -= q; f.Harvested += q;
             float tithe = Church != null ? q * Balance.Tithe : 0;
             if (tithe > 0) Church.Stock[(int)Good.Grain] += tithe;
-            if (pantry != null)
+            float net = q - tithe;
+            if (reaper != null) { float cut = net * Balance.ReaperShare; reaper.Stock[(int)Good.Grain] += cut; net -= cut; }
+            Action<Building, float> toPantry = (home, g) =>
             {
-                pantry.Stock[(int)Good.Grain] += q - tithe;
-                if (pantry.VillageId >= 0) Assess(pantry, 0, (q - tithe) * Policy.HarvestTax);   // the crown's share, for the reeve to collect (a house outside every village goes untaxed)
+                home.Stock[(int)Good.Grain] += g;
+                if (home.VillageId >= 0) Assess(home, 0, g * Policy.HarvestTax);   // the crown's share, for the reeve to collect (a house outside every village goes untaxed)
+            };
+            if (f.Type == BuildingType.OpenField)
+            {
+                int held = Math.Max(1, HeldShares(f));
+                for (int i = 0; i < Slots(f); i++)
+                {
+                    int h = HolderAt(f, i); if (h < 0) continue;
+                    var home = HomeOf(GetCitizen(h));
+                    if (home != null) toPantry(home, net / held); else PutInStores(Good.Grain, net / held);
+                }
             }
-            else PutInStores(Good.Grain, q - tithe);
+            else if (pantry != null) toPantry(pantry, net);
+            else PutInStores(Good.Grain, net);
             Today.Harvest += q; Today.Tithe += tithe;
             return q - tithe;
         }
@@ -311,7 +324,7 @@ namespace MedievalTown.Simulation
                 foreach (var f in Buildings)
                 {
                     if (!f.Built || !f.Def.IsField || f.CropLeft < 1 || DomainOf(f) != dom) continue;
-                    if (f.Type == BuildingType.Demesne ? !lordPays : HomeOf(GetCitizen(f.HolderId)) == null) continue;
+                    if (f.Type == BuildingType.Demesne ? !lordPays : f.Type == BuildingType.OpenField ? HeldShares(f) == 0 : HomeOf(GetCitizen(f.HolderId)) == null) continue;
                     float n; hands.TryGetValue(f.Id, out n);
                     float shortBy = f.CropLeft - n * Balance.HarvestPerWorker * left * 0.9f;
                     if (shortBy > bestShort) { bestShort = shortBy; best = f; }
@@ -332,20 +345,16 @@ namespace MedievalTown.Simulation
         void Labour(Building f, Citizen p, float hands)
         {
             bool lords = f.Type == BuildingType.Demesne;
-            var pantry = lords ? null : HomeOf(GetCitizen(f.HolderId));
-            if (!lords && pantry == null) return;
-            float got = FieldWork(f, hands, ReeveBonus(f), pantry);
+            var pantry = lords || f.Type == BuildingType.OpenField ? null : HomeOf(GetCitizen(f.HolderId));
+            if (!lords && f.Type == BuildingType.Strip && pantry == null) return;
+            if (!lords && f.Type == BuildingType.OpenField && HeldShares(f) == 0) return;
+            FieldWork(f, hands, ReeveBonus(f), pantry, lords ? null : HomeOf(p));
             if (lords)
             {
                 int dom = DomainOf(f);
                 if (dom < 0) { float w = Math.Min(Policy.FreeWage, Math.Max(0, Coin)); Coin -= w; WeekOut += w; p.Coin += w; Book("Wages: the demesne", -w); }
                 else p.Coin += TakeFromLord(dom, Policy.FreeWage);
-                return;
             }
-            var home = HomeOf(p);
-            float share = Math.Min(pantry.Stock[(int)Good.Grain], got * Balance.ReaperShare);
-            if (share <= 0 || home == null) return;
-            pantry.Stock[(int)Good.Grain] -= share; home.Stock[(int)Good.Grain] += share;
         }
 
         void BuildWork(Building s, Citizen p)

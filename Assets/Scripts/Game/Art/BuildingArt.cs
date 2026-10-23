@@ -247,6 +247,7 @@ namespace MedievalTown.Game.Art
                 case BuildingType.Church: Church(k); break;
                 case BuildingType.Granary: Granary(k); break;
                 case BuildingType.Strip: Strip(k); break;
+                case BuildingType.OpenField: Strip(k, 32); break;
                 case BuildingType.Demesne: Demesne(k); break;
                 case BuildingType.Woodcutter: Woodward(k); break;
                 case BuildingType.Quarry: Quarry(k); break;
@@ -393,7 +394,7 @@ namespace MedievalTown.Game.Art
 
             // ---- ground: trampled dirt, corner stakes and string lines
             var bg = new PixelCanvas(W, H);
-            bool flat = type == BuildingType.Strip || type == BuildingType.Demesne;
+            bool flat = type == BuildingType.Strip || type == BuildingType.OpenField || type == BuildingType.Demesne;
             if (!flat) bg.R(1, L + 1, W - 2, fh - 2, winter ? "#d8d2c6" : "#9e7a4d");
             if (!flat) for (int i = 0; i < W * d.H / 2; i++) bg.D(1 + (int)(Hs(i, (int)type, 3) * (W - 2)), L + 1 + (int)(Hs((int)type, i, 4) * (fh - 2)), winter ? "#c4beb2" : "#8a6a42");
             if (flat)

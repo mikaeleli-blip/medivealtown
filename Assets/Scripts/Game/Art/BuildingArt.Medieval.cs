@@ -472,8 +472,9 @@ namespace MedievalTown.Game.Art
             k.M.PileAt = new Vector2Int(36, y0 + 31);
         }
 
-        /// <summary>A family's strips in the open field: long ploughed ridges with grass balks between and a boundary stone. No fences: it's common land.</summary>
-        static void Strip(Ctx k)
+        /// <summary>Strips in the open field: long ploughed ridges with grass balks between and meer stones. No fences: it's common land.
+        /// An old strip field is one family's (three strips); a great open field has a wider strip for each share.</summary>
+        static void Strip(Ctx k, int band = 15)
         {
             var bg = k.Bg; var tg = k.Tg; bool W = k.Winter;
             int w = k.W, h = k.H;
@@ -481,16 +482,20 @@ namespace MedievalTown.Game.Art
             // ridge and furrow, running up and down the field in three strips
             for (int x = 2; x < w - 2; x++)
             {
-                int inStrip = (x - 2) % 15;
-                if (inStrip == 14) { for (int y = 1; y < h - 1; y++) bg.D(x, y, W ? SNOW2 : (y % 3 == 0 ? "#6a9a48" : "#5a8a3e")); continue; }   // the grass balk
+                int inStrip = (x - 2) % band;
+                if (inStrip == band - 1) { for (int y = 1; y < h - 1; y++) bg.D(x, y, W ? SNOW2 : (y % 3 == 0 ? "#6a9a48" : "#5a8a3e")); continue; }   // the grass balk
                 string c = W ? (inStrip % 4 == 0 ? "#dfe8ec" : SNOW) : (inStrip % 4 == 0 ? "#5e3e24" : inStrip % 4 == 2 ? "#8a6240" : "#7a5232");
                 for (int y = 2; y < h - 2; y++) bg.D(x, y, c);
             }
             // headlands top and bottom where the plough turns
             bg.R(1, 1, w - 2, 1, W ? SNOW : "#8a6a42"); bg.R(1, h - 2, w - 2, 1, W ? SNOW : "#8a6a42");
-            // a meer stone marking the family's strips
-            tg.R(2, h - 7, 3, 4, StoneC[0]); tg.R(2, h - 7, 3, 1, StoneC[2]); tg.D(4, h - 5, StoneC[3]);
-            if (W) tg.D(3, h - 8, SNOW);
+            // a meer stone marking each family's strips
+            for (int sx = 2; sx + 3 < w; sx += band)
+            {
+                tg.R(sx, h - 7, 3, 4, StoneC[0]); tg.R(sx, h - 7, 3, 1, StoneC[2]); tg.D(sx + 2, h - 5, StoneC[3]);
+                if (W) tg.D(sx + 1, h - 8, SNOW);
+                if (band < 20) break;
+            }
             k.M.PileAt = new Vector2Int(w - 12, h - 2);
         }
 

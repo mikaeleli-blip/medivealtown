@@ -117,76 +117,80 @@ namespace MedievalTown.Simulation
             return home.Type == BuildingType.Cottage;
         }
 
-        /// <summary>Every serf family with a cottage holds a strip field; strips without a family go to those without.</summary>
+        /// <summary>Every serf family with a cottage holds a share in a field (a share of an open field, or an old strip field);
+        /// shares without a family go to those without, and any still spare to families with the hands for two.</summary>
         public void AssignStrips()
         {
-            var strips = OfType(BuildingType.Strip).ToList();
+            var fields = Buildings.Where(b => b.Built && IsFarm(b.Type)).ToList();
+            var slots = new List<KeyValuePair<Building, int>>();
+            foreach (var f in fields) for (int i = 0; i < Slots(f); i++) slots.Add(new KeyValuePair<Building, int>(f, i));
             var heads = new HashSet<int>();
             foreach (var home in Buildings.Where(b => b.Built && b.Type == BuildingType.Cottage && b.Residents.Count > 0))
             {
                 var h = HeadOf(home);
                 if (h != null && !(h.Rank == Rank.Freeman)) heads.Add(h.Id);
             }
-            // a strip whose holder is gone passes to whoever leads that household now
-            foreach (var s in strips)
+            Func<KeyValuePair<Building, int>, int> H = sl => HolderAt(sl.Key, sl.Value);
+            // a share whose holder is gone passes to whoever leads that household now
+            foreach (var sl in slots)
             {
-                if (s.HolderId < 0 || heads.Contains(s.HolderId)) continue;
-                var old = GetCitizen(s.HolderId);
+                int id = H(sl); if (id < 0 || heads.Contains(id)) continue;
+                var old = GetCitizen(id);
                 int now = old != null ? HouseholdOf(old) : -1;
-                s.HolderId = heads.Contains(now) ? now : -1;
+                SetHolder(sl.Key, sl.Value, heads.Contains(now) ? now : -1);
             }
             // no family holds more than two
-            foreach (var g in strips.Where(x => x.HolderId >= 0).GroupBy(x => x.HolderId).Where(g => g.Count() > 2).ToList())
-                foreach (var x in g.Skip(2)) x.HolderId = -1;
+            foreach (var g in slots.Where(x => H(x) >= 0).GroupBy(x => H(x)).Where(g => g.Count() > 2).ToList())
+                foreach (var x in g.Skip(2)) SetHolder(x.Key, x.Value, -1);
             var count = new Dictionary<int, int>();
-            foreach (var x in strips) if (x.HolderId >= 0) { int c; count.TryGetValue(x.HolderId, out c); count[x.HolderId] = c + 1; }
+            foreach (var x in slots) { int id = H(x); if (id >= 0) { int c; count.TryGetValue(id, out c); count[id] = c + 1; } }
             Func<int, int> held = id => { int c; return count.TryGetValue(id, out c) ? c : 0; };
-            Action<Building, int> give = (st, id) => { if (st.HolderId >= 0) count[st.HolderId]--; st.HolderId = id; int c; count.TryGetValue(id, out c); count[id] = c + 1; };
+            Action<KeyValuePair<Building, int>, int> give = (sl, id) => { int was = H(sl); if (was >= 0) count[was]--; SetHolder(sl.Key, sl.Value, id); int c; count.TryGetValue(id, out c); count[id] = c + 1; };
             var without = heads.Where(h => held(h) == 0).ToList();
             Func<int, Building, int> dist = (id, st) =>
             {
                 var home = HomeOf(GetCitizen(id)); if (home == null) return int.MaxValue / 2;
                 int dx = home.X - st.X, dy = home.Y - st.Y; return dx * dx + dy * dy + (home.VillageId == st.VillageId && st.VillageId >= 0 ? 0 : 100000);
             };
-            // every family gets a strip before any gets a second: a family without one takes a free strip, or else a big family's second
+            // every family gets a share before any gets a second: a family without one takes a free share, or else a big family's second
             foreach (var id in without.ToList())
             {
-                var free = strips.Where(x => x.HolderId < 0).OrderBy(x => dist(id, x)).FirstOrDefault();
-                if (free == null) free = strips.Where(x => x.HolderId >= 0 && held(x.HolderId) > 1).OrderBy(x => dist(id, x)).FirstOrDefault();
+                var free = slots.Where(x => H(x) < 0).OrderBy(x => dist(id, x.Key)).Select(x => (KeyValuePair<Building, int>?)x).FirstOrDefault();
+                if (free == null) free = slots.Where(x => H(x) >= 0 && held(H(x)) > 1).OrderBy(x => dist(id, x.Key)).Select(x => (KeyValuePair<Building, int>?)x).FirstOrDefault();
                 if (free == null) break;
-                give(free, id); without.Remove(id);
+                give(free.Value, id); without.Remove(id);
             }
-            // strips still going spare go to families with the hands to reap two (four grown workers or more), in their own village
-            foreach (var st in strips.Where(x => x.HolderId < 0).ToList())
+            // shares still going spare go to families with the hands to work two (four grown workers or more), in their own village
+            foreach (var sl in slots.Where(x => H(x) < 0).ToList())
             {
                 int pick = -1, bestHands = 3;
                 foreach (var id in heads)
                 {
                     if (held(id) != 1) continue;
-                    var home = HomeOf(GetCitizen(id)); if (home == null || home.VillageId != st.VillageId) continue;
+                    var home = HomeOf(GetCitizen(id)); if (home == null || home.VillageId != sl.Key.VillageId) continue;
                     int hands = home.Residents.Count(r => { var c = GetCitizen(r); return c != null && !c.IsChild && c.Age < 58 && c.Rank == Rank.Serf; });
                     if (hands > bestHands) { bestHands = hands; pick = id; }
                 }
-                if (pick >= 0) give(st, pick);
+                if (pick >= 0) give(sl, pick);
             }
         }
 
-        /// <summary>Strip fields in a village a newcomer family could take: free ones, and big families' second strips.</summary>
+        /// <summary>Field shares in a village a newcomer family could take: free ones, and big families' second shares.</summary>
         public int SpareStrips(int villageId)
         {
-            int strips = Buildings.Count(b => b.Built && b.Type == BuildingType.Strip && b.VillageId == villageId);
+            int shares = Buildings.Where(b => b.Built && IsFarm(b.Type) && b.VillageId == villageId).Sum(b => Slots(b));
             int families = Buildings.Count(b => b.Built && b.Type == BuildingType.Cottage && b.Residents.Count > 0 && b.VillageId == villageId && HeadOf(b) != null && HeadOf(b).Rank != Rank.Freeman);
-            return strips - families;
+            return shares - families;
         }
 
-        /// <summary>The family's strip that most wants work today (a big family may hold two).</summary>
+        /// <summary>The field the family holds a share in that most wants work today (a big family may hold two).</summary>
         public Building StripOf(Citizen p)
         {
             int head = HouseholdOf(p);
             Building first = null, best = null; float bestScore = float.MaxValue;
             foreach (var b in Buildings)
             {
-                if (b.Type != BuildingType.Strip || !b.Built || b.HolderId != head) continue;
+                if (!b.Built || !IsFarm(b.Type) || SharesOf(b, head) == 0) continue;
                 if (first == null) first = b;
                 float score = Season <= 1 ? b.CropGrowth : -b.CropLeft;
                 if (score < bestScore) { bestScore = score; best = b; }

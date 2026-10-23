@@ -24,6 +24,7 @@ namespace MedievalTown.Simulation
 
         // Fields
         public int HolderId = -1;        // the serf household (its head) that holds a strip
+        public List<int> Shares = new List<int>();   // an open field: the household holding each share (-1: free)
         public float CropGrowth;         // 0..1 through spring and summer
         public float CropLeft;           // grain still standing in autumn
         public float Harvested;          // brought in this year

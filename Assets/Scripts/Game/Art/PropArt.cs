@@ -37,10 +37,10 @@ namespace MedievalTown.Game.Art
 
         /// <summary>Crops overlay for a field of any size (whole tiles). Two frames sway in the wind.
         /// Strips run up and down the field with grass balks between them; the demesne is ploughed across.</summary>
-        public static Sprite FieldCrops(int stage, int frame, float harvestedFrac, int w = 48, int h = 48, bool strips = false)
+        public static Sprite FieldCrops(int stage, int frame, float harvestedFrac, int w = 48, int h = 48, bool strips = false, int band = 15)
         {
             int hk = Mathf.Clamp(Mathf.RoundToInt(harvestedFrac * 10), 0, 10);
-            return Cached("crops" + stage + frame + "_" + (stage == 4 ? hk : 0) + "_" + w + "x" + h + (strips ? "s" : ""), () =>
+            return Cached("crops" + stage + frame + "_" + (stage == 4 ? hk : 0) + "_" + w + "x" + h + (strips ? "s" + band : ""), () =>
             {
                 var g = new PixelCanvas(w, h);
                 if (stage == 0) return g;
@@ -50,7 +50,7 @@ namespace MedievalTown.Game.Art
                     int y = 4 + row * 4;
                     for (int x = 3; x < w - 3; x += 3)
                     {
-                        if (strips && (x - 2) % 15 >= 13) continue;   // keep the balks clear
+                        if (strips && (x - 2) % band >= band - 2) continue;   // keep the balks clear
                         float hh = Noise.Hash(x, y, 4);
                         int sw = ((x / 3 + frame + row) % 2);
                         switch (stage)

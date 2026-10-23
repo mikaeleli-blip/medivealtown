@@ -34,7 +34,7 @@ A sound opening:
 2. **Woodward's Lodge** and **Quarry**: freemen fell timber and break stone. Serfs on week-work help when sites wait.
 3. **Windmill**: everyone must grind at the king's mill and leave the crown's share. Bread goes further than pottage.
 4. **Steward's Hall**, the **Parish Church**, then the **Castle**, and finally **walls, towers and a gatehouse** around it.
-5. More **Cottages** and **Strip Fields** as families grow. A family without a strip goes hungry.
+5. More **Cottages**, and an **Open Field** for every eight families. A family without a share in a field goes hungry.
 6. Branch out: a **Village Cross** founds a new village; a **Baron's Manor** in one of them raises a barony.
 
 ## The realm
@@ -193,8 +193,11 @@ Goods are local. Nothing is shared across the whole map any more.
 | **Freemen** | Take up the trades and shops for an entry fine and run them for themselves, hire on as hands for a wage, or work the crown's mill, woods and quarry. Pay rent (0.6c a week) and the market toll, and buy bread, grain and firewood. |
 | **Serfs** | Owe the king week-work: 2 days a week by custom, on his building sites, carting stone and timber, and gathering his wood. When there's nothing to do they go back to their own strips, which they work the rest of the week. Sunday is for mass. |
 
-**Families and land.** A serf family only settles where there's an empty cottage *and* a strip field going spare. A big
-family (five or more) takes a second strip if one's free, and gives it up to a newcomer family that has none. Families
+**Families and land.** The village farms **open fields**: each holds shares (long strips) for eight serf families, who sow,
+tend and reap it together; each family takes the crop of its own strips and pays its harvest tax on it. A hired reaper
+keeps his cut. A serf family only settles where there's an empty cottage *and* a share going spare. A family with four or
+more grown workers takes a second share if one's free, and gives it up to a newcomer family that has none. In autumn
+families reap before any week-work. (Old strip fields in saved games still work as a field with one share.) Families
 hold off having children when their village is short of grain, and the **Laws** can stop births altogether (the royal
 family may always have heirs).
 
@@ -213,7 +216,7 @@ the new reeve.
 | Track | Tracks | 1×1 | free | instant |
 | Cottage | Homes | 2×3 | 10 / 0 | 6 |
 | Freeman's House | Homes | 2×3 | 16 / 4 | 9 |
-| Strip Field | Fields | 5×4 | 0 / 0 | 3 |
+| Open Field (8 shares) | Fields | 16×8 | 0 / 0 | 16 |
 | Woodward's Lodge | Works | 2×2 | 8 / 0 | 5 |
 | Quarry | Works | 2×2 | 6 / 0 | 5 |
 | Windmill | Works | 2×2 | 20 / 6 | 12 |

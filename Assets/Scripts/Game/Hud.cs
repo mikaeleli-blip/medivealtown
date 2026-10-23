@@ -199,7 +199,7 @@ namespace MedievalTown.Game
             int homeless = T.People.Count(p => p.HomeId < 0);
             if (homeless > 0 && si >= 1) lines.Add(new KeyValuePair<string, bool>(homeless + " in tents. Build cottages before " + (si == 1 ? "autumn." : "the cold kills them."), si >= 2));
             int noStrip = T.Buildings.Count(b => { if (!b.Built || b.Type != BuildingType.Cottage || b.Residents.Count == 0) return false; var hd = T.HeadOf(b); return hd != null && hd.Rank != Rank.Freeman && T.StripOf(hd) == null; });
-            if (noStrip > 0) lines.Add(new KeyValuePair<string, bool>((noStrip == 1 ? "A serf family has" : noStrip + " serf families have") + " no strip field. They'll go hungry.", true));
+            if (noStrip > 0) lines.Add(new KeyValuePair<string, bool>((noStrip == 1 ? "A serf family has" : noStrip + " serf families have") + " no share in a field. They'll go hungry. Build an Open Field.", true));
             float need = T.HouseholdKeep, year = T.CourtYear;
             if (si <= 1 && need > 0 && T.StoreStock(Good.Grain) < need * 0.9f) lines.Add(new KeyValuePair<string, bool>("The granary won't feed the court until harvest.", T.StoreStock(Good.Grain) < need * 0.5f));
             else if (year > 0 && T.StoreStock(Good.Grain) < year * 0.5f) lines.Add(new KeyValuePair<string, bool>("The royal granary holds less than half a year's bread for the court.", false));
@@ -222,7 +222,7 @@ namespace MedievalTown.Game
             foreach (var v in T.Villages)
             {
                 bool emptyCottage = T.Buildings.Any(b => b.Built && b.Type == BuildingType.Cottage && b.Residents.Count == 0 && b.VillageId == v.Id);
-                if (emptyCottage && T.SpareStrips(v.Id) == 0) { lines.Add(new KeyValuePair<string, bool>(v.Name + " has an empty cottage but no strip field to go with it. No family will settle.", false)); break; }
+                if (emptyCottage && T.SpareStrips(v.Id) == 0) { lines.Add(new KeyValuePair<string, bool>(v.Name + " has an empty cottage but no free share in a field to go with it. No family will settle. Build an Open Field.", false)); break; }
             }
             if (T.OfType(BuildingType.Bakehouse).Any() && T.WorkingMill == null) lines.Add(new KeyValuePair<string, bool>("The bakehouse needs a working windmill.", false));
             if (lines.Count == 0) return;
@@ -763,7 +763,7 @@ namespace MedievalTown.Game
             pol.Dole = Ui.Toggle(new Rect(bx, by, bw, 11), pol.Dole, "The granary feeds the hungry"); by += 14;
             Heading("Families");
             pol.Births = Ui.Toggle(new Rect(bx, by, bw, 11), pol.Births, "Couples have children"); by += 14;
-            Para("Off: no children are born outside the royal family. Families hold off on their own when their village is short of grain. New serf families only settle where there's a cottage and a strip field going spare.");
+            Para("Off: no children are born outside the royal family. Families hold off on their own when their village is short of grain. New serf families only settle where there's a cottage and a share in a field going spare.");
             Para("A gentle king feeds the hungry whatever the laws say.");
 
             Heading("This week");
@@ -884,7 +884,7 @@ namespace MedievalTown.Game
             var w = T.GetBuilding(p.WorkId);
             if (w != null) Row("Trade", w.Def.Name);
             var strip = p.Rank == Rank.Serf || p.Rank == Rank.Reeve ? T.StripOf(p) : null;
-            if (p.Rank == Rank.Serf || p.Rank == Rank.Reeve) Row("Family strip", strip != null ? Mathf.RoundToInt(strip.CropGrowth * 100) + "% grown" : "none", strip != null ? Ui.Ink : Ui.Bad);
+            if (p.Rank == Rank.Serf || p.Rank == Rank.Reeve) Row("Family field", strip != null ? Mathf.RoundToInt(strip.CropGrowth * 100) + "% grown" : "none", strip != null ? Ui.Ink : Ui.Bad);
             if (!p.IsNoble && p.Rank != Rank.Priest && p.Rank != Rank.Knight && p.Rank != Rank.Steward && !p.IsChild) Meter("Loyalty", p.Loyalty);
             Meter("Piety", p.Piety);
             Meter("Health", p.Health);
@@ -942,6 +942,14 @@ namespace MedievalTown.Game
                 {
                     var holder = T.GetCitizen(b.HolderId);
                     if (b.Type == BuildingType.Strip) Row("Held by", holder != null ? "the " + holder.Family + " family" : "nobody", holder != null ? Ui.Ink : Ui.Warn);
+                    if (b.Type == BuildingType.OpenField)
+                    {
+                        int held = T.HeldShares(b), all = T.Slots(b);
+                        Row("Shares held", held + " of " + all, held < all ? Ui.Warn : Ui.Ink);
+                        var fams = T.HoldersOf(b).Select(id => T.GetCitizen(id)).Where(c => c != null).Select(c => c.Family + (T.SharesOf(b, c.Id) > 1 ? " (2)" : "")).ToArray();
+                        if (fams.Length > 0) Para("The " + string.Join(", ", fams) + " families.");
+                        if (held < all) Para("A serf family that comes to an empty cottage takes a free share.");
+                    }
                     Row("Crop", Mathf.RoundToInt(b.CropGrowth * 100) + "% grown");
                     if (T.Season == 2 || b.Harvested > 0) Row("Reaped / standing", Mathf.FloorToInt(b.Harvested) + " / " + Mathf.FloorToInt(b.CropLeft));
                     int hands = T.People.Count(p => p.TaskId == b.Id && (p.Chore == Chore.OwnStrip || p.Chore == Chore.WeekWork || p.Chore == Chore.Labour));
@@ -1113,6 +1121,7 @@ namespace MedievalTown.Game
                         if (b.Type == BuildingType.VillageCross && bv != null) s += "\nAnswers to " + T.LiegeName(bv);
                         if (b.Built && Town.IsHome(b.Type)) s += "\n" + (b.Residents.Count == 0 ? "Empty" : b.Residents.Count + " living here");
                         if (b.Built && b.Type == BuildingType.Strip) { var hd = T.GetCitizen(b.HolderId); s += "\n" + (hd != null ? "The " + hd.Family + " family's strips" : "No family holds it"); }
+                        if (b.Built && b.Type == BuildingType.OpenField) s += "\n" + T.HeldShares(b) + " of " + T.Slots(b) + " shares held";
                     }
                 }
                 else

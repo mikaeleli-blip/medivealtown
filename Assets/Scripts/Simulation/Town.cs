@@ -74,6 +74,7 @@ namespace MedievalTown.Simulation
                 b.Stock = Fit(b.Stock); b.Delivered = Fit(b.Delivered);
                 if (b.Residents == null) b.Residents = new List<int>();
                 if (b.Employees == null) b.Employees = new List<int>();
+                if (b.Shares == null) b.Shares = new List<int>();
                 // older saves: the freeman family already working a shop holds it, with nothing owed
                 if (b.Def.IsShop && b.OwnerId < 0 && b.Wage <= 0 && b.Employees.Count > 0)
                 {
@@ -528,11 +529,11 @@ namespace MedievalTown.Simulation
             steward.Honesty = (float)Math.Round(t.Rnd(0.3f, 1f), 2); steward.Loyalty = 70; steward.Coin = 5; t.StewardId = steward.Id;
             foreach (var p in new[] { lord, lady, knight, priest, steward }) p.HomeId = pav.Id;
 
-            // the village: six serf families with their cottages and strips, and two freemen
+            // the village: six serf families with their cottages and their shares in the open field, and two freemen
+            var field = t.Place(BuildingType.OpenField, VillageX - 1, TrailRow + 2, out err, true);
             for (int i = 0; i < 6; i++)
             {
                 var home = t.Place(BuildingType.Cottage, VillageX + i * 3, TrailRow - 3, out err, true);
-                var strip = t.Place(BuildingType.Strip, VillageX - 1 + (i % 3) * 6, TrailRow + 2 + (i / 3) * 5, out err, true);
                 string fam = t.Pick(Defs.PeasantNames);
                 var dad = t.AddPerson(false, fam, t.Rnd(22, 44), Rank.Serf);
                 var mom = t.AddPerson(true, fam, t.Rnd(19, 38), Rank.Serf);
@@ -541,7 +542,7 @@ namespace MedievalTown.Simulation
                 for (int k = 0; k < n; k++) t.Child(mom, dad, t.Rnd(0.5f, 13));
                 if (i == 0) { var gran = t.AddPerson(true, fam, t.Rnd(52, 64), Rank.Serf); gran.MotherId = -1; dad.MotherId = gran.Id; }   // his widowed mother lives with them
                 home.Stock[(int)Good.Grain] = 130; home.Stock[(int)Good.Firewood] = 20; home.Stock[(int)Good.Cloth] = 8;
-                strip.HolderId = dad.Id;
+                if (field != null) t.SetHolder(field, i, dad.Id);
                 foreach (var p in t.People.Where(p => p.Family == fam && p.HomeId < 0)) p.HomeId = home.Id;
             }
             for (int i = 0; i < 2; i++)
